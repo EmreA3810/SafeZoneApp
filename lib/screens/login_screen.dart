@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -82,36 +83,46 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 48),
 
-              // Google Sign In Button
-              FilledButton.icon(
-                onPressed: _isLoading ? null : _signInWithGoogle,
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Image.asset(
-                        'assets/google_logo.png',
-                        height: 24,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.g_mobiledata, size: 24);
-                        },
+              // Google Sign In Button or Loading Animation
+              if (_isLoading)
+                Center(
+                  child: Column(
+                    children: [
+                      LoadingAnimationWidget.threeArchedCircle(
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 50,
                       ),
-                label: Text(
-                  _isLoading ? 'Signing in...' : 'Sign in with Google',
-                  style: const TextStyle(fontSize: 16),
-                ),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Signing in...',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: _signInWithGoogle,
+                  icon: Image.asset(
+                    'assets/google_logo.png',
+                    height: 24,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.g_mobiledata, size: 24);
+                    },
+                  ),
+                  label: const Text(
+                    'Sign in with Google',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 24),
 
               // Terms and Privacy

@@ -258,6 +258,9 @@ class ReportCard extends StatelessWidget {
                   report.title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -282,7 +285,11 @@ class ReportCard extends StatelessWidget {
                 // Description
                 Text(
                   report.description,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black87,
+                  ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
