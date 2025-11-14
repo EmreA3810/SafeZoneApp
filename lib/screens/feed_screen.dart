@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/image_from_string.dart';
 import '../services/report_service.dart';
 import '../services/auth_service.dart';
 import '../models/report_model.dart';
@@ -210,8 +210,8 @@ class ReportCard extends StatelessWidget {
           // User info header
           ListTile(
             leading: CircleAvatar(
-              backgroundImage: report.userPhotoUrl != null
-                  ? CachedNetworkImageProvider(report.userPhotoUrl!)
+                backgroundImage: report.userPhotoUrl != null
+                  ? NetworkImage(report.userPhotoUrl!) as ImageProvider
                   : null,
               child: report.userPhotoUrl == null
                   ? Text(report.userName[0].toUpperCase())
@@ -231,22 +231,14 @@ class ReportCard extends StatelessWidget {
           ),
 
           // Image
-          if (report.photoUrls.isNotEmpty)
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: CachedNetworkImage(
-                imageUrl: report.photoUrls.first,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: const Icon(Icons.error),
-                ),
-              ),
-            ),
+                  if (report.photoUrls.isNotEmpty)
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: ImageFromString(
+                        src: report.photoUrls.first,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
 
           Padding(
             padding: const EdgeInsets.all(16),

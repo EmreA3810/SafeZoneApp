@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../widgets/image_from_string.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../services/report_service.dart';
 import '../services/auth_service.dart';
@@ -182,23 +182,9 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                             ),
                             child: AspectRatio(
                               aspectRatio: 16 / 9,
-                              child: CachedNetworkImage(
-                                imageUrl: report.photoUrls.first,
+                              child: ImageFromString(
+                                src: report.photoUrls.first,
                                 fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  child: const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  child: const Icon(Icons.error),
-                                ),
                               ),
                             ),
                           ),

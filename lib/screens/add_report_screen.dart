@@ -9,6 +9,7 @@ import '../services/report_service.dart';
 import '../services/auth_service.dart';
 import '../models/report_model.dart';
 import 'location_picker_screen.dart';
+import '../widgets/image_from_string.dart';
 
 class AddReportScreen extends StatefulWidget {
   final Report? existingReport;
@@ -314,15 +315,15 @@ class _AddReportScreenState extends State<AddReportScreen> {
                   itemBuilder: (context, index) {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          widget.existingReport!.photoUrls[index],
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: ImageFromString(
+                            src: widget.existingReport!.photoUrls[index],
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                      ),
                     );
                   },
                 ),

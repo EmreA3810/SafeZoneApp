@@ -41,6 +41,8 @@ dependencies:
   google_sign_in: ^6.2.2
   cloud_firestore: ^5.5.1
   firebase_storage: ^12.3.8
+  firebase_database: ^11.3.10
+  flutter_image_compress: ^2.4.0
   
   # State Management
   provider: ^6.1.2

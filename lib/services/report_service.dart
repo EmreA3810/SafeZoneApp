@@ -1,12 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'dart:io';
 import '../models/report_model.dart';
+import 'image_utils.dart';
 
 class ReportService extends ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseDatabase _database = FirebaseDatabase.instance;
 
   List<Report> _reports = [];
   List<Report> get reports => _reports;
@@ -20,14 +19,26 @@ class ReportService extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      final snapshot = await _firestore
-          .collection('reports')
-          .orderBy('createdAt', descending: true)
-          .get();
+      final snap = await _database.ref().child('reports').get();
 
-      _reports = snapshot.docs
-          .map((doc) => Report.fromMap(doc.id, doc.data()))
-          .toList();
+      if (!snap.exists || snap.value == null) {
+        _reports = [];
+      } else {
+        final data = snap.value as Map<dynamic, dynamic>;
+        final list = <Report>[];
+        data.forEach((key, value) {
+          try {
+            final map = Map<String, dynamic>.from(value as Map);
+            list.add(Report.fromMap(key.toString(), map));
+          } catch (e) {
+            if (kDebugMode) print('Error parsing report entry: $e');
+          }
+        });
+
+        // Sort by createdAt descending
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _reports = list;
+      }
 
       _isLoading = false;
       notifyListeners();
@@ -44,19 +55,24 @@ class ReportService extends ChangeNotifier {
   // Fetch user's reports
   Future<List<Report>> fetchUserReports(String userId) async {
     try {
-      final snapshot = await _firestore
-          .collection('reports')
-          .where('userId', isEqualTo: userId)
-          .get();
+      final snap = await _database.ref().child('reports').get();
+      final reports = <Report>[];
+      if (!snap.exists || snap.value == null) return reports;
 
-      // Sort in memory instead of using orderBy (which requires an index)
-      final reports = snapshot.docs
-          .map((doc) => Report.fromMap(doc.id, doc.data()))
-          .toList();
+      final data = snap.value as Map<dynamic, dynamic>;
+      data.forEach((key, value) {
+        try {
+          final map = Map<String, dynamic>.from(value as Map);
+          if (map['userId'] == userId) {
+            reports.add(Report.fromMap(key.toString(), map));
+          }
+        } catch (e) {
+          if (kDebugMode) print('Error parsing report entry: $e');
+        }
+      });
 
       // Sort by createdAt manually
       reports.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
       return reports;
     } catch (e) {
       if (kDebugMode) {
@@ -66,44 +82,66 @@ class ReportService extends ChangeNotifier {
     }
   }
 
-  // Upload images to Firebase Storage
-  Future<List<String>> uploadImages(List<File> images, String reportId) async {
-    List<String> imageUrls = [];
+  // Compress images and return base64 strings to store in Realtime Database
+  Future<List<String>> uploadImagesAsBase64(List<File> images,
+      {int targetWidth = 800, int quality = 70, int maxImages = 3}) async {
+    List<String> imageBase64 = [];
 
-    for (int i = 0; i < images.length; i++) {
+    final limit = images.length < maxImages ? images.length : maxImages;
+
+    for (int i = 0; i < limit; i++) {
       try {
-        final ref = _storage.ref().child('reports/$reportId/image_$i.jpg');
-        await ref.putFile(images[i]);
-        final url = await ref.getDownloadURL();
-        imageUrls.add(url);
+        final base64 = await ImageUtils.compressFileToBase64(
+          images[i],
+          targetWidth: targetWidth,
+          quality: quality,
+        );
+        imageBase64.add(base64);
       } catch (e) {
         if (kDebugMode) {
-          print('Error uploading image: $e');
+          print('Error compressing/uploading image as base64: $e');
         }
       }
     }
 
-    return imageUrls;
+    return imageBase64;
   }
 
   // Create a new report
   Future<void> createReport(Report report, List<File> images) async {
     try {
-      // Create report document first to get the ID
-      final docRef = await _firestore.collection('reports').add(report.toMap());
+      // Create a new report node to get a key
+      final ref = _database.ref().child('reports').push();
 
-      // Upload images if any
+      // Prepare base map and set it (photoUrls may be empty for now)
+      final map = report.toMap();
+      await ref.set(map);
+
+      // Upload images if any (compress to base64)
       if (images.isNotEmpty) {
-        final imageUrls = await uploadImages(images, docRef.id);
-
-        // Update report with image URLs
-        await docRef.update({'photoUrls': imageUrls});
+        final imageBase64 = await uploadImagesAsBase64(images);
+        if (imageBase64.isNotEmpty) {
+          await ref.update({'photoUrls': imageBase64});
+        }
       }
 
-      // Update user's report count (use set with merge to create if doesn't exist)
-      await _firestore.collection('users').doc(report.userId).set({
-        'reportsSubmitted': FieldValue.increment(1),
-      }, SetOptions(merge: true));
+      // Update user's report count (best-effort read-modify-write; no transaction)
+      final userRef = _database.ref().child('users').child(report.userId);
+      final userSnap = await userRef.get();
+      Map<dynamic, dynamic> userMap = {};
+      if (userSnap.exists && userSnap.value is Map) {
+        userMap = Map<dynamic, dynamic>.from(userSnap.value as Map);
+      }
+      int currentCount = 0;
+      if (userMap['reportsSubmitted'] != null) {
+        try {
+          currentCount = userMap['reportsSubmitted'] as int;
+        } catch (_) {
+          currentCount = 0;
+        }
+      }
+      userMap['reportsSubmitted'] = currentCount + 1;
+      await userRef.set(userMap);
 
       // Refresh reports
       await fetchReports();
@@ -122,7 +160,9 @@ class ReportService extends ChangeNotifier {
     List<File>? newImages,
   ) async {
     try {
-      Map<String, dynamic> updateData = {
+      final ref = _database.ref().child('reports').child(reportId);
+
+      Map<String, Object?> updateData = {
         'title': report.title,
         'description': report.description,
         'category': report.category.name,
@@ -132,13 +172,22 @@ class ReportService extends ChangeNotifier {
         'updatedAt': DateTime.now().toIso8601String(),
       };
 
-      // Upload new images if any
+      // Upload new images (as base64) if any
       if (newImages != null && newImages.isNotEmpty) {
-        final imageUrls = await uploadImages(newImages, reportId);
-        updateData['photoUrls'] = [...report.photoUrls, ...imageUrls];
+        final imageBase64 = await uploadImagesAsBase64(newImages);
+
+        // Read existing photoUrls
+        final snap = await ref.get();
+        List<dynamic> existing = [];
+        if (snap.exists && snap.value is Map) {
+          final map = Map<String, dynamic>.from(snap.value as Map);
+          existing = List<dynamic>.from(map['photoUrls'] ?? []);
+        }
+
+        updateData['photoUrls'] = [...existing, ...imageBase64];
       }
 
-      await _firestore.collection('reports').doc(reportId).update(updateData);
+      await ref.update(updateData);
       await fetchReports();
     } catch (e) {
       if (kDebugMode) {
@@ -151,27 +200,27 @@ class ReportService extends ChangeNotifier {
   // Delete a report
   Future<void> deleteReport(String reportId, String userId) async {
     try {
-      await _firestore.collection('reports').doc(reportId).delete();
+      final ref = _database.ref().child('reports').child(reportId);
+      await ref.remove();
 
-      // Update user's report count (use set with merge to handle if document doesn't exist)
-      await _firestore.collection('users').doc(userId).set({
-        'reportsSubmitted': FieldValue.increment(-1),
-      }, SetOptions(merge: true));
-
-      // Delete images from storage
-      try {
-        final listResult = await _storage
-            .ref()
-            .child('reports/$reportId')
-            .listAll();
-        for (var item in listResult.items) {
-          await item.delete();
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error deleting images: $e');
+      // Decrement user's report count (best-effort read-modify-write)
+      final userRef = _database.ref().child('users').child(userId);
+      final userSnap = await userRef.get();
+      Map<dynamic, dynamic> userMap = {};
+      if (userSnap.exists && userSnap.value is Map) {
+        userMap = Map<dynamic, dynamic>.from(userSnap.value as Map);
+      }
+      int currentCount = 0;
+      if (userMap['reportsSubmitted'] != null) {
+        try {
+          currentCount = userMap['reportsSubmitted'] as int;
+        } catch (_) {
+          currentCount = 0;
         }
       }
+      final next = (currentCount - 1) < 0 ? 0 : (currentCount - 1);
+      userMap['reportsSubmitted'] = next;
+      await userRef.set(userMap);
 
       await fetchReports();
     } catch (e) {
@@ -185,26 +234,24 @@ class ReportService extends ChangeNotifier {
   // Toggle like on a report
   Future<void> toggleLike(String reportId, String userId) async {
     try {
-      final reportDoc = _firestore.collection('reports').doc(reportId);
-      final report = await reportDoc.get();
+      final ref = _database.ref().child('reports').child(reportId);
+      final snap = await ref.get();
+      if (!snap.exists) return;
 
-      if (!report.exists) return;
-
-      final likedBy = List<String>.from(report.data()?['likedBy'] ?? []);
+      final data = snap.value as Map<dynamic, dynamic>;
+      final likedBy = List<String>.from(data['likedBy'] ?? []);
+      int likes = data['likes'] is int ? data['likes'] as int : (int.tryParse('${data['likes']}') ?? 0);
 
       if (likedBy.contains(userId)) {
         // Unlike
-        await reportDoc.update({
-          'likes': FieldValue.increment(-1),
-          'likedBy': FieldValue.arrayRemove([userId]),
-        });
+        likedBy.remove(userId);
+        likes = likes - 1 < 0 ? 0 : likes - 1;
       } else {
-        // Like
-        await reportDoc.update({
-          'likes': FieldValue.increment(1),
-          'likedBy': FieldValue.arrayUnion([userId]),
-        });
+        likedBy.add(userId);
+        likes = likes + 1;
       }
+
+      await ref.update({'likes': likes, 'likedBy': likedBy});
 
       await fetchReports();
     } catch (e) {
@@ -218,7 +265,8 @@ class ReportService extends ChangeNotifier {
   // Update report status (admin function)
   Future<void> updateReportStatus(String reportId, ReportStatus status) async {
     try {
-      await _firestore.collection('reports').doc(reportId).update({
+      final ref = _database.ref().child('reports').child(reportId);
+      await ref.update({
         'status': status.name,
         'updatedAt': DateTime.now().toIso8601String(),
       });
