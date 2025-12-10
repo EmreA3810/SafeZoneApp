@@ -122,9 +122,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(title: const Text('Profile & Settings')),
       body: user == null
           ? const Center(child: Text('Please sign in'))
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
+          : RefreshIndicator(
+              onRefresh: () => authService.refreshUserData(),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                children: [
                 // Profile Header
                 Center(
                   child: Column(
@@ -302,6 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
               ],
+              ),
             ),
     );
   }

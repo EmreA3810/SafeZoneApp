@@ -51,6 +51,7 @@ class _FeedScreenState extends State<FeedScreen> {
             icon: const Icon(Icons.search),
             onPressed: () {
               // TODO: Implement search
+              // TODO; Implement filter
             },
           ),
         ],
@@ -115,55 +116,69 @@ class _FeedScreenState extends State<FeedScreen> {
             child: reportService.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filteredReports.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inbox_outlined,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ? RefreshIndicator(
+                        onRefresh: () => reportService.fetchReports(),
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.inbox_outlined,
+                                  size: 64,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No reports found',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Be the first to report an issue!',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No reports found',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Be the first to report an issue!',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: () => reportService.fetchReports(),
-                    child: ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 80),
-                      itemCount: filteredReports.length,
-                      itemBuilder: (context, index) {
-                        final report = filteredReports[index];
-                        return ReportCard(
-                          report: report,
-                          currentUserId: authService.currentUser?.uid ?? '',
-                          onLike: () {
-                            if (authService.currentUser != null) {
-                              reportService.toggleLike(
-                                report.id!,
-                                authService.currentUser!.uid,
-                              );
-                            }
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => reportService.fetchReports(),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 80),
+                          itemCount: filteredReports.length,
+                          itemBuilder: (context, index) {
+                            final report = filteredReports[index];
+                            return ReportCard(
+                              report: report,
+                              currentUserId: authService.currentUser?.uid ?? '',
+                              onLike: () {
+                                if (authService.currentUser != null) {
+                                  reportService.toggleLike(
+                                    report.id!,
+                                    authService.currentUser!.uid,
+                                  );
+                                }
+                              },
+                            );
                           },
-                        );
-                      },
-                    ),
-                  ),
+                        ),
+                      ),
           ),
         ],
       ),
@@ -171,7 +186,7 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 }
 
-class ReportCard extends StatelessWidget {
+class ReportCard extends StatefulWidget {
   final Report report;
   final String currentUserId;
   final VoidCallback onLike;
@@ -183,16 +198,44 @@ class ReportCard extends StatelessWidget {
     required this.onLike,
   });
 
+  @override
+  State<ReportCard> createState() => _ReportCardState();
+}
+
+class _ReportCardState extends State<ReportCard> {
+  late PageController _pageController;
+  int _currentPageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _pageController.addListener(_onPageChanged);
+  }
+
+  @override
+  void dispose() {
+    _pageController.removeListener(_onPageChanged);
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged() {
+    setState(() {
+      _currentPageIndex = _pageController.page?.round() ?? 0;
+    });
+  }
+
   Color _getStatusColor(BuildContext context) {
-    switch (report.status) {
+    switch (widget.report.status) {
+      case ReportStatus.approved:
+        return Colors.green;
+      case ReportStatus.inProgress:
+        return Colors.blue;
+      case ReportStatus.resolved:
+        return Colors.grey;
       case ReportStatus.pending:
         return Colors.orange;
-      case ReportStatus.approved:
-        return Colors.blue;
-      case ReportStatus.inProgress:
-        return Colors.amber;
-      case ReportStatus.resolved:
-        return Colors.green;
       case ReportStatus.rejected:
         return Colors.red;
     }
@@ -200,6 +243,8 @@ class ReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final report = widget.report;
+    final currentUserId = widget.currentUserId;
     final isLiked = report.likedBy.contains(currentUserId);
 
     return Card(
@@ -230,15 +275,49 @@ class ReportCard extends StatelessWidget {
             ),
           ),
 
-          // Image
-                  if (report.photoUrls.isNotEmpty)
-                    AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: ImageFromString(
-                        src: report.photoUrls.first,
+          // Images carousel
+          if (report.photoUrls.isNotEmpty)
+            Stack(
+              children: [
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: report.photoUrls.length,
+                    itemBuilder: (context, index) {
+                      return ImageFromString(
+                        src: report.photoUrls[index],
                         fit: BoxFit.cover,
+                      );
+                    },
+                  ),
+                ),
+                // Image counter badge
+                if (report.photoUrls.length > 1)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_currentPageIndex + 1}/${report.photoUrls.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
+                  ),
+              ],
+            ),
 
           Padding(
             padding: const EdgeInsets.all(16),
@@ -317,16 +396,16 @@ class ReportCard extends StatelessWidget {
                       icon: Icon(
                         isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
                       ),
-                      onPressed: onLike,
+                      onPressed: widget.onLike,
                       color: isLiked
                           ? Theme.of(context).colorScheme.primary
                           : null,
                     ),
                     Text('${report.likes}'),
                     const SizedBox(width: 16),
-                    const Icon(Icons.comment_outlined),
+                    /*const Icon(Icons.comment_outlined),
                     const SizedBox(width: 4),
-                    Text('${report.comments}'),
+                    Text('${report.comments}'),*/
                   ],
                 ),
               ],

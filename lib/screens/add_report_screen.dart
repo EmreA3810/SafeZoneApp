@@ -27,6 +27,8 @@ class _AddReportScreenState extends State<AddReportScreen> {
 
   ReportCategory _selectedCategory = ReportCategory.other;
   final List<File> _images = [];
+  final List<String> _existingPhotoUrls = [];
+  final List<String> _removedPhotoUrls = [];
   LatLng? _selectedLocation;
   String _locationAddress = '';
   bool _isLoading = false;
@@ -40,6 +42,7 @@ class _AddReportScreenState extends State<AddReportScreen> {
       _selectedCategory = widget.existingReport!.category;
       _selectedLocation = widget.existingReport!.location;
       _locationAddress = widget.existingReport!.locationAddress;
+      _existingPhotoUrls.addAll(widget.existingReport!.photoUrls);
     } else {
       _getCurrentLocation();
     }
@@ -183,7 +186,7 @@ class _AddReportScreenState extends State<AddReportScreen> {
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
         category: _selectedCategory,
-        photoUrls: widget.existingReport?.photoUrls ?? [],
+        photoUrls: widget.existingReport != null ? _existingPhotoUrls : (widget.existingReport?.photoUrls ?? []),
         location: _selectedLocation!,
         locationAddress: _locationAddress,
         userId: authService.currentUser!.uid,
@@ -198,10 +201,14 @@ class _AddReportScreenState extends State<AddReportScreen> {
           widget.existingReport!.id!,
           report,
           _images.isNotEmpty ? _images : null,
+          removedPhotoUrls: _removedPhotoUrls.isNotEmpty ? _removedPhotoUrls : null,
         );
       } else {
         await reportService.createReport(report, _images);
       }
+
+      // Refresh user data so report count stays in sync on profile
+      await authService.refreshUserData();
 
       if (mounted) {
         Navigator.pop(context);
@@ -305,25 +312,48 @@ class _AddReportScreenState extends State<AddReportScreen> {
             Text('Add Photos', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
 
-            // Existing photos (for edit mode)
-            if (widget.existingReport?.photoUrls.isNotEmpty ?? false)
+            // Existing photos (for edit mode) with delete option
+            if (_existingPhotoUrls.isNotEmpty)
               SizedBox(
                 height: 100,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: widget.existingReport!.photoUrls.length,
+                  itemCount: _existingPhotoUrls.length,
                   itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: ImageFromString(
-                            src: widget.existingReport!.photoUrls[index],
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
+                    final url = _existingPhotoUrls[index];
+                    return Stack(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: ImageFromString(
+                              src: url,
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
+                        Positioned(
+                          top: 4,
+                          right: 12,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white),
+                            onPressed: () {
+                              setState(() {
+                                _removedPhotoUrls.add(url);
+                                _existingPhotoUrls.removeAt(index);
+                              });
+                            },
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.black54,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(24, 24),
+                            ),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),

@@ -2,12 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../models/user_model.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseDatabase _database = FirebaseDatabase.instance;
 
   User? get currentUser => _auth.currentUser;
   AppUser? _currentAppUser;
@@ -29,8 +31,35 @@ class AuthService extends ChangeNotifier {
 
   Future<void> _loadUserData(String uid) async {
     try {
+      // Source of truth: Realtime Database users/<uid>/reportsSubmitted
+      int? rtdbCount;
+      final rtdbSnap = await _database.ref().child('users').child(uid).get();
+      if (rtdbSnap.exists && rtdbSnap.value is Map) {
+        final data = Map<String, dynamic>.from(rtdbSnap.value as Map);
+        if (data['reportsSubmitted'] is int) {
+          rtdbCount = data['reportsSubmitted'] as int;
+        } else if (data['reportsSubmitted'] != null) {
+          rtdbCount = int.tryParse('${data['reportsSubmitted']}');
+        }
+      }
+
+      // Build AppUser from auth + RTDB count if present
+      if (rtdbCount != null && _auth.currentUser != null) {
+        final u = _auth.currentUser!;
+        _currentAppUser = AppUser(
+          uid: u.uid,
+          email: u.email ?? '',
+          displayName: u.displayName ?? 'Anonymous',
+          photoUrl: u.photoURL,
+          createdAt: u.metadata.creationTime ?? DateTime.now(),
+          reportsSubmitted: rtdbCount,
+        );
+        return;
+      }
+
+      // Fallback to Firestore
       final doc = await _firestore.collection('users').doc(uid).get();
-      if (doc.exists) {
+      if (doc.exists && doc.data() != null) {
         _currentAppUser = AppUser.fromMap(doc.data()!);
       }
     } catch (e) {
@@ -91,8 +120,28 @@ class AuthService extends ChangeNotifier {
     final userDoc = _firestore.collection('users').doc(user.uid);
     final docSnapshot = await userDoc.get();
 
+    // Ensure RTDB user node exists with reportsSubmitted
+    try {
+      final userRef = _database.ref().child('users').child(user.uid);
+      final snap = await userRef.get();
+      int current = 0;
+      if (snap.exists && snap.value is Map) {
+        final data = Map<String, dynamic>.from(snap.value as Map);
+        if (data['reportsSubmitted'] is int) {
+          current = data['reportsSubmitted'] as int;
+        } else if (data['reportsSubmitted'] != null) {
+          current = int.tryParse('${data['reportsSubmitted']}') ?? 0;
+        }
+      }
+      await userRef.set({'reportsSubmitted': current});
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: failed to init RTDB user node: $e');
+      }
+    }
+
     if (!docSnapshot.exists) {
-      // Create new user with reportsSubmitted initialized to 0
+      // Create new user with reportsSubmitted initialized to 0 (Firestore copy)
       final appUser = AppUser(
         uid: user.uid,
         email: user.email ?? '',

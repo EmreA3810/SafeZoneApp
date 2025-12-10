@@ -94,6 +94,14 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('Map'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              Provider.of<ReportService>(context, listen: false)
+                  .fetchReports();
+            },
+            tooltip: 'Refresh reports',
+          ),
+          IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: () {
               _mapController.move(_currentLocation, 13);
@@ -103,6 +111,7 @@ class _MapScreenState extends State<MapScreen> {
             icon: const Icon(Icons.search),
             onPressed: () {
               // TODO: Implement search
+              // TODO; Implement filter
             },
           ),
         ],

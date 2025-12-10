@@ -9,7 +9,7 @@ class ImageUtils {
   static Future<String> compressFileToBase64(
     File file, {
     int targetWidth = 800,
-    int quality = 70,
+    int quality = 80,
   }) async {
     try {
       final result = await FlutterImageCompress.compressWithFile(

@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import '../models/report_model.dart';
 import 'image_utils.dart';
 
 class ReportService extends ChangeNotifier {
   final FirebaseDatabase _database = FirebaseDatabase.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   List<Report> _reports = [];
   List<Report> get reports => _reports;
@@ -143,6 +145,26 @@ class ReportService extends ChangeNotifier {
       userMap['reportsSubmitted'] = currentCount + 1;
       await userRef.set(userMap);
 
+      // Mirror count to Firestore so profile screen stays in sync
+      try {
+        final doc = await _firestore.collection('users').doc(report.userId).get();
+        int firestoreCount = 0;
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data['reportsSubmitted'] is int) {
+            firestoreCount = data['reportsSubmitted'] as int;
+          }
+        }
+        await _firestore
+            .collection('users')
+            .doc(report.userId)
+            .set({'reportsSubmitted': firestoreCount + 1}, SetOptions(merge: true));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Warning: failed to mirror report count to Firestore: $e');
+        }
+      }
+
       // Refresh reports
       await fetchReports();
     } catch (e) {
@@ -157,8 +179,9 @@ class ReportService extends ChangeNotifier {
   Future<void> updateReport(
     String reportId,
     Report report,
-    List<File>? newImages,
-  ) async {
+    List<File>? newImages, {
+    List<String>? removedPhotoUrls,
+  }) async {
     try {
       final ref = _database.ref().child('reports').child(reportId);
 
@@ -172,20 +195,28 @@ class ReportService extends ChangeNotifier {
         'updatedAt': DateTime.now().toIso8601String(),
       };
 
-      // Upload new images (as base64) if any
+      // Read existing photoUrls (we may need to remove items or append new uploads)
+      final snap = await ref.get();
+      List<dynamic> existing = [];
+      if (snap.exists && snap.value is Map) {
+        final map = Map<String, dynamic>.from(snap.value as Map);
+        existing = List<dynamic>.from(map['photoUrls'] ?? []);
+      }
+
+      // Remove any requested photo URLs
+      if (removedPhotoUrls != null && removedPhotoUrls.isNotEmpty) {
+        existing.removeWhere((e) => removedPhotoUrls.contains(e));
+      }
+
+      // Upload new images (as base64) and append
       if (newImages != null && newImages.isNotEmpty) {
         final imageBase64 = await uploadImagesAsBase64(newImages);
-
-        // Read existing photoUrls
-        final snap = await ref.get();
-        List<dynamic> existing = [];
-        if (snap.exists && snap.value is Map) {
-          final map = Map<String, dynamic>.from(snap.value as Map);
-          existing = List<dynamic>.from(map['photoUrls'] ?? []);
+        if (imageBase64.isNotEmpty) {
+          existing = [...existing, ...imageBase64];
         }
-
-        updateData['photoUrls'] = [...existing, ...imageBase64];
       }
+
+      updateData['photoUrls'] = existing;
 
       await ref.update(updateData);
       await fetchReports();
@@ -221,6 +252,27 @@ class ReportService extends ChangeNotifier {
       final next = (currentCount - 1) < 0 ? 0 : (currentCount - 1);
       userMap['reportsSubmitted'] = next;
       await userRef.set(userMap);
+
+      // Mirror decrement to Firestore
+      try {
+        final doc = await _firestore.collection('users').doc(userId).get();
+        int firestoreCount = 0;
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data['reportsSubmitted'] is int) {
+            firestoreCount = data['reportsSubmitted'] as int;
+          }
+        }
+        final nextFs = (firestoreCount - 1) < 0 ? 0 : (firestoreCount - 1);
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .set({'reportsSubmitted': nextFs}, SetOptions(merge: true));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Warning: failed to mirror report count to Firestore: $e');
+        }
+      }
 
       await fetchReports();
     } catch (e) {
