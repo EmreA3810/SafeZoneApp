@@ -6,6 +6,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../services/auth_service.dart';
 import '../providers/theme_provider.dart';
+import '../models/user_model.dart';
+import 'admin_user_management_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -186,6 +188,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
+                      const SizedBox(height: 6),
+                      if (appUser?.role == UserRole.admin)
+                        Chip(
+                          label: const Text('Admin'),
+                          avatar: const Icon(Icons.shield_outlined, size: 18),
+                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                          labelStyle: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
                       const SizedBox(height: 4),
                       Text(
                         user.email ?? '',
@@ -292,6 +304,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                   ),
                 ),
+                const SizedBox(height: 8),
+
+                // Admin Tools (visible only for admins)
+                if (appUser?.role == UserRole.admin) ...[
+                  Text(
+                    'Admin Tools',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.admin_panel_settings_outlined),
+                      title: const Text('Manage Users'),
+                      subtitle: const Text('View users and change roles'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AdminUserManagementScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 32),
 
                 // Sign Out Button

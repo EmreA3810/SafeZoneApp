@@ -1,3 +1,5 @@
+enum UserRole { user, admin }
+
 class AppUser {
   final String uid;
   final String email;
@@ -5,6 +7,7 @@ class AppUser {
   final String? photoUrl;
   final DateTime createdAt;
   final int reportsSubmitted;
+  final UserRole role;
 
   AppUser({
     required this.uid,
@@ -13,6 +16,7 @@ class AppUser {
     this.photoUrl,
     required this.createdAt,
     this.reportsSubmitted = 0,
+    this.role = UserRole.user,
   });
 
   Map<String, dynamic> toMap() {
@@ -23,6 +27,7 @@ class AppUser {
       'photoUrl': photoUrl,
       'createdAt': createdAt.toIso8601String(),
       'reportsSubmitted': reportsSubmitted,
+      'role': role.name,
     };
   }
 
@@ -34,6 +39,10 @@ class AppUser {
       photoUrl: map['photoUrl'],
       createdAt: DateTime.parse(map['createdAt']),
       reportsSubmitted: map['reportsSubmitted'] ?? 0,
+      role: UserRole.values.firstWhere(
+        (e) => e.name == map['role'],
+        orElse: () => UserRole.user,
+      ),
     );
   }
 
@@ -44,6 +53,7 @@ class AppUser {
     String? photoUrl,
     DateTime? createdAt,
     int? reportsSubmitted,
+    UserRole? role,
   }) {
     return AppUser(
       uid: uid ?? this.uid,
@@ -52,6 +62,7 @@ class AppUser {
       photoUrl: photoUrl ?? this.photoUrl,
       createdAt: createdAt ?? this.createdAt,
       reportsSubmitted: reportsSubmitted ?? this.reportsSubmitted,
+      role: role ?? this.role,
     );
   }
 }
