@@ -7,10 +7,16 @@ class AdminUserManagementScreen extends StatefulWidget {
   const AdminUserManagementScreen({super.key});
 
   @override
-  State<AdminUserManagementScreen> createState() => _AdminUserManagementScreenState();
+  State<AdminUserManagementScreen> createState() =>
+      _AdminUserManagementScreenState();
 }
 
 class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
+  static const double _roleBadgePadding = 12.0;
+  static const double _roleBadgeRadius = 16.0;
+  static const double _roleBadgeBorderWidth = 1.5;
+  static const double _roleIconSize = 16.0;
+
   List<AppUser> _allUsers = [];
   List<AppUser> _filteredUsers = [];
   bool _isLoading = true;
@@ -30,9 +36,9 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       _applyFilter();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load users: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load users: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -66,14 +72,18 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Updated ${user.displayName}\'s role to ${role.name}')),
+          SnackBar(
+            content: Text(
+              'Updated ${user.displayName}\'s role to ${role.displayName}',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update role: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update role: $e')));
       }
     }
   }
@@ -81,7 +91,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
-    final isAdmin = auth.currentAppUser?.role == UserRole.admin;
+    final isAdmin = auth.currentAppUser?.role.isAdmin ?? false;
 
     if (!isAdmin) {
       return Scaffold(
@@ -121,29 +131,22 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                         final user = _filteredUsers[index];
                         return ListTile(
                           leading: CircleAvatar(
-                            child: Text(user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?'),
+                            backgroundImage: user.photoUrl != null
+                                ? NetworkImage(user.photoUrl!)
+                                : null,
+                            child: user.photoUrl == null
+                                ? Text(
+                                    user.displayName.isNotEmpty
+                                        ? user.displayName[0].toUpperCase()
+                                        : '?',
+                                  )
+                                : null,
                           ),
                           title: Text(user.displayName),
                           subtitle: Text(user.email),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Chip(
-                                label: Text(user.role.name),
-                              ),
-                              const SizedBox(width: 8),
-                              PopupMenuButton<UserRole>(
-                                tooltip: 'Change role',
-                                onSelected: (role) => _updateRole(user, role),
-                                itemBuilder: (context) => UserRole.values
-                                    .map((r) => PopupMenuItem(
-                                          value: r,
-                                          child: Text(r.name),
-                                        ))
-                                    .toList(),
-                                child: const Icon(Icons.more_vert),
-                              ),
-                            ],
+                          trailing: _RoleBadgeButton(
+                            user: user,
+                            onRoleChanged: (role) => _updateRole(user, role),
                           ),
                         );
                       },
@@ -151,6 +154,87 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+
+}
+
+class _RoleBadgeButton extends StatelessWidget {
+  final AppUser user;
+  final void Function(UserRole) onRoleChanged;
+
+  const _RoleBadgeButton({required this.user, required this.onRoleChanged});
+
+  static IconData _getRoleIcon(UserRole role) =>
+      role.isAdmin ? Icons.admin_panel_settings : Icons.person;
+
+  static Color _getRoleColor(UserRole role) =>
+      role.isAdmin ? Colors.red : Colors.blue;
+
+  @override
+  Widget build(BuildContext context) {
+    final roleColor = _getRoleColor(user.role);
+    final roleIcon = _getRoleIcon(user.role);
+
+    return PopupMenuButton<UserRole>(
+      tooltip: 'Change role',
+      onSelected: onRoleChanged,
+      itemBuilder: (context) => UserRole.values
+          .map(
+            (r) => PopupMenuItem(
+              value: r,
+              child: Row(
+                children: [
+                  Icon(_getRoleIcon(r), size: 18, color: _getRoleColor(r)),
+                  const SizedBox(width: 8),
+                  Text(r.displayName),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: _AdminUserManagementScreenState._roleBadgePadding,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: roleColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(
+            _AdminUserManagementScreenState._roleBadgeRadius,
+          ),
+          border: Border.all(
+            color: roleColor,
+            width: _AdminUserManagementScreenState._roleBadgeBorderWidth,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              roleIcon,
+              size: _AdminUserManagementScreenState._roleIconSize,
+              color: roleColor,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              user.role.displayName,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: roleColor,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: _AdminUserManagementScreenState._roleIconSize,
+              color: roleColor,
+            ),
+          ],
+        ),
       ),
     );
   }
