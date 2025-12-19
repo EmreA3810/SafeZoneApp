@@ -15,6 +15,10 @@ class MyReportsScreen extends StatefulWidget {
 }
 
 class _MyReportsScreenState extends State<MyReportsScreen> {
+  static const double _cardRadius = 12;
+  static const double _cardPadding = 16;
+  static const double _imageAspectRatio = 16 / 9;
+
   List<Report> _userReports = [];
   bool _isLoading = true;
 
@@ -115,6 +119,41 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
     ).then((_) => _loadUserReports());
   }
 
+  Widget _buildEmptyState(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _loadUserReports,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        children: [
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.description_outlined,
+                size: 64,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No reports yet',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Start by creating your first report!',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Color _getStatusColor(ReportStatus status) {
     switch (status) {
       case ReportStatus.pending:
@@ -141,41 +180,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
           : _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _userReports.isEmpty
-          ? RefreshIndicator(
-              onRefresh: _loadUserReports,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.description_outlined,
-                        size: 64,
-                        color:
-                            Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No reports yet',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Start by creating your first report!',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            )
+          ? _buildEmptyState(context)
           : RefreshIndicator(
               onRefresh: _loadUserReports,
               child: ListView.builder(
@@ -185,26 +190,26 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                   final report = _userReports[index];
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(_cardRadius),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Image
+                        // Images carousel
                         if (report.photoUrls.isNotEmpty)
                           ClipRRect(
                             borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12),
+                              top: Radius.circular(_cardRadius),
                             ),
-                            child: AspectRatio(
-                              aspectRatio: 16 / 9,
-                              child: ImageFromString(
-                                src: report.photoUrls.first,
-                                fit: BoxFit.cover,
-                              ),
+                            child: _ReportImageCarousel(
+                              photoUrls: report.photoUrls,
+                              aspectRatio: _imageAspectRatio,
                             ),
                           ),
 
                         Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(_cardPadding),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -226,11 +231,9 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                                 style: Theme.of(context).textTheme.titleLarge
                                     ?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color:
-                                          Theme.of(context).brightness ==
-                                              Brightness.dark
-                                          ? Colors.white
-                                          : Colors.black,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                     ),
                               ),
                               const SizedBox(height: 8),
@@ -238,7 +241,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                               // Status
                               Chip(
                                 label: Text(
-                                  report.getStatusDisplayName(),
+                                  report.status.displayName,
                                   style: const TextStyle(fontSize: 12),
                                 ),
                                 backgroundColor: _getStatusColor(
@@ -257,11 +260,9 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                                 report.description,
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
-                                      color:
-                                          Theme.of(context).brightness ==
-                                              Brightness.dark
-                                          ? Colors.white
-                                          : Colors.black,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -300,6 +301,85 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                 },
               ),
             ),
+    );
+  }
+}
+
+class _ReportImageCarousel extends StatefulWidget {
+  final List<String> photoUrls;
+  final double aspectRatio;
+
+  const _ReportImageCarousel({
+    required this.photoUrls,
+    required this.aspectRatio,
+  });
+
+  @override
+  State<_ReportImageCarousel> createState() => _ReportImageCarouselState();
+}
+
+class _ReportImageCarouselState extends State<_ReportImageCarousel> {
+  late final PageController _pageController;
+  int _currentPageIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _pageController.addListener(_onPageChanged);
+  }
+
+  @override
+  void dispose() {
+    _pageController.removeListener(_onPageChanged);
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged() {
+    setState(() {
+      _currentPageIndex = _pageController.page?.round() ?? 0;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        AspectRatio(
+          aspectRatio: widget.aspectRatio,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: widget.photoUrls.length,
+            itemBuilder: (context, index) {
+              return ImageFromString(
+                src: widget.photoUrls[index],
+                fit: BoxFit.cover,
+              );
+            },
+          ),
+        ),
+        if (widget.photoUrls.length > 1)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_currentPageIndex + 1}/${widget.photoUrls.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

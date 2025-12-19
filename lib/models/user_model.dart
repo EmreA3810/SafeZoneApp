@@ -1,4 +1,18 @@
-enum UserRole { user, admin }
+enum UserRole {
+  user,
+  admin;
+
+  String get displayName {
+    switch (this) {
+      case UserRole.user:
+        return 'User';
+      case UserRole.admin:
+        return 'Admin';
+    }
+  }
+
+  bool get isAdmin => this == UserRole.admin;
+}
 
 class AppUser {
   final String uid;
@@ -9,7 +23,7 @@ class AppUser {
   final int reportsSubmitted;
   final UserRole role;
 
-  AppUser({
+  const AppUser({
     required this.uid,
     required this.email,
     required this.displayName,
@@ -24,7 +38,7 @@ class AppUser {
       'uid': uid,
       'email': email,
       'displayName': displayName,
-      'photoUrl': photoUrl,
+      if (photoUrl != null) 'photoUrl': photoUrl,
       'createdAt': createdAt.toIso8601String(),
       'reportsSubmitted': reportsSubmitted,
       'role': role.name,
@@ -32,17 +46,23 @@ class AppUser {
   }
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
+    final roleName = map['role'] as String?;
+
     return AppUser(
-      uid: map['uid'] ?? '',
-      email: map['email'] ?? '',
-      displayName: map['displayName'] ?? '',
-      photoUrl: map['photoUrl'],
-      createdAt: DateTime.parse(map['createdAt']),
-      reportsSubmitted: map['reportsSubmitted'] ?? 0,
-      role: UserRole.values.firstWhere(
-        (e) => e.name == map['role'],
-        orElse: () => UserRole.user,
-      ),
+      uid: map['uid'] as String? ?? '',
+      email: map['email'] as String? ?? '',
+      displayName: map['displayName'] as String? ?? '',
+      photoUrl: map['photoUrl'] as String?,
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'] as String)
+          : DateTime.now(),
+      reportsSubmitted: (map['reportsSubmitted'] as num?)?.toInt() ?? 0,
+      role: roleName != null
+          ? UserRole.values.firstWhere(
+              (e) => e.name == roleName,
+              orElse: () => UserRole.user,
+            )
+          : UserRole.user,
     );
   }
 
@@ -65,4 +85,15 @@ class AppUser {
       role: role ?? this.role,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppUser && runtimeType == other.runtimeType && uid == other.uid;
+
+  @override
+  int get hashCode => uid.hashCode;
+
+  @override
+  String toString() => 'AppUser(uid: $uid, email: $email, role: ${role.name})';
 }

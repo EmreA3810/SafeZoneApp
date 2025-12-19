@@ -14,6 +14,9 @@ class LocationPickerScreen extends StatefulWidget {
 }
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
+  static const LatLng _fallbackLocation = LatLng(40.7128, -74.0060); // NYC
+  static const double _defaultZoom = 15;
+
   late MapController _mapController;
   late LatLng _selectedLocation;
   String _address = '';
@@ -23,9 +26,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   void initState() {
     super.initState();
     _mapController = MapController();
-    _selectedLocation =
-        widget.initialLocation ??
-        const LatLng(40.7128, -74.0060); // Default to NYC
+    _selectedLocation = widget.initialLocation ?? _fallbackLocation;
     if (widget.initialLocation == null) {
       _getCurrentLocation();
     } else {
@@ -39,10 +40,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       setState(() {
         _selectedLocation = LatLng(position.latitude, position.longitude);
       });
-      _mapController.move(_selectedLocation, 15);
+      _mapController.move(_selectedLocation, _defaultZoom);
       _getAddressFromLocation(_selectedLocation);
     } catch (e) {
       // Use default location if getting current location fails
+      _mapController.move(_selectedLocation, _defaultZoom);
     }
   }
 
@@ -58,7 +60,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         setState(() {
-          _address = '${place.street ?? ''}, ${place.locality ?? ''}';
+          _address = _formatAddress(place);
           _isLoadingAddress = false;
         });
       }
@@ -68,6 +70,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         _isLoadingAddress = false;
       });
     }
+  }
+
+  String _formatAddress(Placemark place) {
+    final parts = [
+      place.street,
+      place.locality,
+      place.administrativeArea,
+      place.country,
+    ].where((p) => p != null && p.trim().isNotEmpty).toList();
+    return parts.isNotEmpty ? parts.join(', ') : 'Unnamed location';
   }
 
   void _onMapTap(TapPosition tapPosition, LatLng location) {
@@ -102,7 +114,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _selectedLocation,
-              initialZoom: 15,
+              initialZoom: _defaultZoom,
               onTap: _onMapTap,
             ),
             children: [

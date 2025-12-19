@@ -6,6 +6,10 @@ import '../models/report_model.dart';
 import 'image_utils.dart';
 
 class ReportService extends ChangeNotifier {
+  static const String _reportsPath = 'reports';
+  static const String _usersPath = 'users';
+  static const String _reportsSubmittedKey = 'reportsSubmitted';
+
   final FirebaseDatabase _database = FirebaseDatabase.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -15,13 +19,17 @@ class ReportService extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
   // Fetch all reports
   Future<void> fetchReports() async {
     try {
-      _isLoading = true;
-      notifyListeners();
+      _setLoading(true);
 
-      final snap = await _database.ref().child('reports').get();
+      final snap = await _database.ref().child(_reportsPath).get();
 
       if (!snap.exists || snap.value == null) {
         _reports = [];
@@ -42,11 +50,9 @@ class ReportService extends ChangeNotifier {
         _reports = list;
       }
 
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
       if (kDebugMode) {
         print('Error fetching reports: $e');
       }
@@ -57,7 +63,7 @@ class ReportService extends ChangeNotifier {
   // Fetch user's reports
   Future<List<Report>> fetchUserReports(String userId) async {
     try {
-      final snap = await _database.ref().child('reports').get();
+      final snap = await _database.ref().child(_reportsPath).get();
       final reports = <Report>[];
       if (!snap.exists || snap.value == null) return reports;
 
@@ -85,8 +91,12 @@ class ReportService extends ChangeNotifier {
   }
 
   // Compress images and return base64 strings to store in Realtime Database
-  Future<List<String>> uploadImagesAsBase64(List<File> images,
-      {int targetWidth = 800, int quality = 70, int maxImages = 3}) async {
+  Future<List<String>> uploadImagesAsBase64(
+    List<File> images, {
+    int targetWidth = 800,
+    int quality = 70,
+    int maxImages = 3,
+  }) async {
     List<String> imageBase64 = [];
 
     final limit = images.length < maxImages ? images.length : maxImages;
@@ -113,7 +123,7 @@ class ReportService extends ChangeNotifier {
   Future<void> createReport(Report report, List<File> images) async {
     try {
       // Create a new report node to get a key
-      final ref = _database.ref().child('reports').push();
+      final ref = _database.ref().child(_reportsPath).push();
 
       // Prepare base map and set it (photoUrls may be empty for now)
       final map = report.toMap();
@@ -128,42 +138,7 @@ class ReportService extends ChangeNotifier {
       }
 
       // Update user's report count (best-effort read-modify-write; no transaction)
-      final userRef = _database.ref().child('users').child(report.userId);
-      final userSnap = await userRef.get();
-      Map<dynamic, dynamic> userMap = {};
-      if (userSnap.exists && userSnap.value is Map) {
-        userMap = Map<dynamic, dynamic>.from(userSnap.value as Map);
-      }
-      int currentCount = 0;
-      if (userMap['reportsSubmitted'] != null) {
-        try {
-          currentCount = userMap['reportsSubmitted'] as int;
-        } catch (_) {
-          currentCount = 0;
-        }
-      }
-      userMap['reportsSubmitted'] = currentCount + 1;
-      await userRef.set(userMap);
-
-      // Mirror count to Firestore so profile screen stays in sync
-      try {
-        final doc = await _firestore.collection('users').doc(report.userId).get();
-        int firestoreCount = 0;
-        if (doc.exists && doc.data() != null) {
-          final data = doc.data()!;
-          if (data['reportsSubmitted'] is int) {
-            firestoreCount = data['reportsSubmitted'] as int;
-          }
-        }
-        await _firestore
-            .collection('users')
-            .doc(report.userId)
-            .set({'reportsSubmitted': firestoreCount + 1}, SetOptions(merge: true));
-      } catch (e) {
-        if (kDebugMode) {
-          print('Warning: failed to mirror report count to Firestore: $e');
-        }
-      }
+      await _updateUserReportCount(report.userId, 1);
 
       // Refresh reports
       await fetchReports();
@@ -183,7 +158,7 @@ class ReportService extends ChangeNotifier {
     List<String>? removedPhotoUrls,
   }) async {
     try {
-      final ref = _database.ref().child('reports').child(reportId);
+      final ref = _database.ref().child(_reportsPath).child(reportId);
 
       Map<String, Object?> updateData = {
         'title': report.title,
@@ -231,48 +206,10 @@ class ReportService extends ChangeNotifier {
   // Delete a report
   Future<void> deleteReport(String reportId, String userId) async {
     try {
-      final ref = _database.ref().child('reports').child(reportId);
+      final ref = _database.ref().child(_reportsPath).child(reportId);
       await ref.remove();
 
-      // Decrement user's report count (best-effort read-modify-write)
-      final userRef = _database.ref().child('users').child(userId);
-      final userSnap = await userRef.get();
-      Map<dynamic, dynamic> userMap = {};
-      if (userSnap.exists && userSnap.value is Map) {
-        userMap = Map<dynamic, dynamic>.from(userSnap.value as Map);
-      }
-      int currentCount = 0;
-      if (userMap['reportsSubmitted'] != null) {
-        try {
-          currentCount = userMap['reportsSubmitted'] as int;
-        } catch (_) {
-          currentCount = 0;
-        }
-      }
-      final next = (currentCount - 1) < 0 ? 0 : (currentCount - 1);
-      userMap['reportsSubmitted'] = next;
-      await userRef.set(userMap);
-
-      // Mirror decrement to Firestore
-      try {
-        final doc = await _firestore.collection('users').doc(userId).get();
-        int firestoreCount = 0;
-        if (doc.exists && doc.data() != null) {
-          final data = doc.data()!;
-          if (data['reportsSubmitted'] is int) {
-            firestoreCount = data['reportsSubmitted'] as int;
-          }
-        }
-        final nextFs = (firestoreCount - 1) < 0 ? 0 : (firestoreCount - 1);
-        await _firestore
-            .collection('users')
-            .doc(userId)
-            .set({'reportsSubmitted': nextFs}, SetOptions(merge: true));
-      } catch (e) {
-        if (kDebugMode) {
-          print('Warning: failed to mirror report count to Firestore: $e');
-        }
-      }
+      await _updateUserReportCount(userId, -1);
 
       await fetchReports();
     } catch (e) {
@@ -286,13 +223,15 @@ class ReportService extends ChangeNotifier {
   // Toggle like on a report
   Future<void> toggleLike(String reportId, String userId) async {
     try {
-      final ref = _database.ref().child('reports').child(reportId);
+      final ref = _database.ref().child(_reportsPath).child(reportId);
       final snap = await ref.get();
       if (!snap.exists) return;
 
       final data = snap.value as Map<dynamic, dynamic>;
       final likedBy = List<String>.from(data['likedBy'] ?? []);
-      int likes = data['likes'] is int ? data['likes'] as int : (int.tryParse('${data['likes']}') ?? 0);
+      int likes = data['likes'] is int
+          ? data['likes'] as int
+          : (int.tryParse('${data['likes']}') ?? 0);
 
       if (likedBy.contains(userId)) {
         // Unlike
@@ -317,7 +256,7 @@ class ReportService extends ChangeNotifier {
   // Update report status (admin function)
   Future<void> updateReportStatus(String reportId, ReportStatus status) async {
     try {
-      final ref = _database.ref().child('reports').child(reportId);
+      final ref = _database.ref().child(_reportsPath).child(reportId);
       await ref.update({
         'status': status.name,
         'updatedAt': DateTime.now().toIso8601String(),
@@ -329,5 +268,37 @@ class ReportService extends ChangeNotifier {
       }
       rethrow;
     }
+  }
+
+  Future<void> _updateUserReportCount(String userId, int delta) async {
+    // RTDB update
+    try {
+      final userRef = _database.ref().child(_usersPath).child(userId);
+      final snap = await userRef.get();
+      int current = 0;
+      if (snap.exists && snap.value is Map) {
+        current = _parseReportsCount(
+          Map<String, dynamic>.from(snap.value as Map),
+        );
+      }
+      final next = (current + delta).clamp(0, 1 << 31);
+      await userRef.set({_reportsSubmittedKey: next});
+
+      // Mirror to Firestore
+      await _firestore.collection(_usersPath).doc(userId).set({
+        _reportsSubmittedKey: next,
+      }, SetOptions(merge: true));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: failed to update report count: $e');
+      }
+    }
+  }
+
+  int _parseReportsCount(Map<String, dynamic> data) {
+    final value = data[_reportsSubmittedKey];
+    if (value is int) return value;
+    if (value != null) return int.tryParse('$value') ?? 0;
+    return 0;
   }
 }

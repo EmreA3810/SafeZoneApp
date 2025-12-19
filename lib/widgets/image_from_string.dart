@@ -17,7 +17,8 @@ class ImageFromString extends StatelessWidget {
     this.height,
   }) : super(key: key);
 
-  bool get _isNetwork => src.startsWith('http://') || src.startsWith('https://');
+  bool get _isNetwork =>
+      src.startsWith('http://') || src.startsWith('https://');
 
   @override
   Widget build(BuildContext context) {
@@ -38,19 +39,27 @@ class ImageFromString extends StatelessWidget {
       );
     }
 
-    try {
-      final Uint8List bytes = ImageUtils.base64ToBytes(src);
-      return Image.memory(
-        bytes,
-        fit: fit,
-        width: width,
-        height: height,
-      );
-    } catch (e) {
-      return Container(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        child: const Icon(Icons.error),
-      );
+    // Base64 image branch (with normalization and simple validation)
+    if (ImageUtils.isLikelyBase64(src)) {
+      try {
+        final Uint8List bytes = ImageUtils.base64ToBytes(src);
+        return Image.memory(
+          bytes,
+          fit: fit,
+          width: width,
+          height: height,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.medium,
+        );
+      } catch (e) {
+        // Fallthrough to error box below
+      }
     }
+
+    // Unknown or invalid content
+    return Container(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: const Icon(Icons.error),
+    );
   }
 }

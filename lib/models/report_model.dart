@@ -1,6 +1,27 @@
 import 'package:latlong2/latlong.dart';
 
-enum ReportStatus { pending, approved, inProgress, resolved, rejected }
+enum ReportStatus {
+  pending,
+  approved,
+  inProgress,
+  resolved,
+  rejected;
+
+  String get displayName {
+    switch (this) {
+      case ReportStatus.pending:
+        return 'Pending';
+      case ReportStatus.approved:
+        return 'Approved';
+      case ReportStatus.inProgress:
+        return 'In Progress';
+      case ReportStatus.resolved:
+        return 'Resolved';
+      case ReportStatus.rejected:
+        return 'Rejected';
+    }
+  }
+}
 
 enum ReportCategory {
   roadHazard,
@@ -11,7 +32,30 @@ enum ReportCategory {
   parking,
   noise,
   waste,
-  other,
+  other;
+
+  String get displayName {
+    switch (this) {
+      case ReportCategory.roadHazard:
+        return 'Road Hazard';
+      case ReportCategory.streetlight:
+        return 'Streetlight';
+      case ReportCategory.graffiti:
+        return 'Graffiti';
+      case ReportCategory.lostPet:
+        return 'Lost Pet';
+      case ReportCategory.foundPet:
+        return 'Found Pet';
+      case ReportCategory.parking:
+        return 'Parking Issue';
+      case ReportCategory.noise:
+        return 'Noise Complaint';
+      case ReportCategory.waste:
+        return 'Waste Management';
+      case ReportCategory.other:
+        return 'Other';
+    }
+  }
 }
 
 class Report {
@@ -32,7 +76,7 @@ class Report {
   final int comments;
   final List<String> likedBy;
 
-  Report({
+  const Report({
     this.id,
     required this.title,
     required this.description,
@@ -62,9 +106,9 @@ class Report {
       'locationAddress': locationAddress,
       'userId': userId,
       'userName': userName,
-      'userPhotoUrl': userPhotoUrl,
+      if (userPhotoUrl != null) 'userPhotoUrl': userPhotoUrl,
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
       'status': status.name,
       'likes': likes,
       'comments': comments,
@@ -73,31 +117,43 @@ class Report {
   }
 
   factory Report.fromMap(String id, Map<String, dynamic> map) {
+    final categoryName = map['category'] as String?;
+    final statusName = map['status'] as String?;
+
     return Report(
       id: id,
-      title: map['title'] ?? '',
-      description: map['description'] ?? '',
-      category: ReportCategory.values.firstWhere(
-        (e) => e.name == map['category'],
-        orElse: () => ReportCategory.other,
+      title: map['title'] as String? ?? '',
+      description: map['description'] as String? ?? '',
+      category: categoryName != null
+          ? ReportCategory.values.firstWhere(
+              (e) => e.name == categoryName,
+              orElse: () => ReportCategory.other,
+            )
+          : ReportCategory.other,
+      photoUrls: (map['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [],
+      location: LatLng(
+        (map['latitude'] as num?)?.toDouble() ?? 0.0,
+        (map['longitude'] as num?)?.toDouble() ?? 0.0,
       ),
-      photoUrls: List<String>.from(map['photoUrls'] ?? []),
-      location: LatLng(map['latitude'] ?? 0.0, map['longitude'] ?? 0.0),
-      locationAddress: map['locationAddress'] ?? '',
-      userId: map['userId'] ?? '',
-      userName: map['userName'] ?? '',
-      userPhotoUrl: map['userPhotoUrl'],
-      createdAt: DateTime.parse(map['createdAt']),
+      locationAddress: map['locationAddress'] as String? ?? '',
+      userId: map['userId'] as String? ?? '',
+      userName: map['userName'] as String? ?? '',
+      userPhotoUrl: map['userPhotoUrl'] as String?,
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'] as String)
+          : DateTime.now(),
       updatedAt: map['updatedAt'] != null
-          ? DateTime.parse(map['updatedAt'])
+          ? DateTime.parse(map['updatedAt'] as String)
           : null,
-      status: ReportStatus.values.firstWhere(
-        (e) => e.name == map['status'],
-        orElse: () => ReportStatus.pending,
-      ),
-      likes: map['likes'] ?? 0,
-      comments: map['comments'] ?? 0,
-      likedBy: List<String>.from(map['likedBy'] ?? []),
+      status: statusName != null
+          ? ReportStatus.values.firstWhere(
+              (e) => e.name == statusName,
+              orElse: () => ReportStatus.pending,
+            )
+          : ReportStatus.pending,
+      likes: (map['likes'] as num?)?.toInt() ?? 0,
+      comments: (map['comments'] as num?)?.toInt() ?? 0,
+      likedBy: (map['likedBy'] as List<dynamic>?)?.cast<String>() ?? [],
     );
   }
 
@@ -139,41 +195,15 @@ class Report {
     );
   }
 
-  String getCategoryDisplayName() {
-    switch (category) {
-      case ReportCategory.roadHazard:
-        return 'Road Hazard';
-      case ReportCategory.streetlight:
-        return 'Streetlight';
-      case ReportCategory.graffiti:
-        return 'Graffiti';
-      case ReportCategory.lostPet:
-        return 'Lost Pet';
-      case ReportCategory.foundPet:
-        return 'Found Pet';
-      case ReportCategory.parking:
-        return 'Parking Issue';
-      case ReportCategory.noise:
-        return 'Noise Complaint';
-      case ReportCategory.waste:
-        return 'Waste Management';
-      case ReportCategory.other:
-        return 'Other';
-    }
-  }
+  String getCategoryDisplayName() => category.displayName;
 
-  String getStatusDisplayName() {
-    switch (status) {
-      case ReportStatus.pending:
-        return 'Pending';
-      case ReportStatus.approved:
-        return 'Approved';
-      case ReportStatus.inProgress:
-        return 'In Progress';
-      case ReportStatus.resolved:
-        return 'Resolved';
-      case ReportStatus.rejected:
-        return 'Rejected';
-    }
-  }
+  String getStatusDisplayName() => status.displayName;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Report && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

@@ -14,8 +14,11 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  static const LatLng _fallbackLocation = LatLng(40.7128, -74.0060); // NYC
+  static const double _defaultZoom = 13;
+
   late MapController _mapController;
-  LatLng _currentLocation = const LatLng(40.7128, -74.0060); // Default to NYC
+  LatLng _currentLocation = _fallbackLocation;
   Report? _selectedReport;
 
   @override
@@ -41,10 +44,11 @@ class _MapScreenState extends State<MapScreen> {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);
         });
-        _mapController.move(_currentLocation, 13);
+        _mapController.move(_currentLocation, _defaultZoom);
       }
     } catch (e) {
       // Use default location if getting current location fails
+      _mapController.move(_currentLocation, _defaultZoom);
     }
   }
 
@@ -85,6 +89,22 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _openSearch() {
+    final reportService = Provider.of<ReportService>(context, listen: false);
+    showSearch(
+      context: context,
+      delegate: MapSearchDelegate(
+        reports: reportService.reports,
+        onReportSelected: (report) {
+          setState(() {
+            _selectedReport = report;
+            _mapController.move(report.location, _defaultZoom);
+          });
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final reportService = Provider.of<ReportService>(context);
@@ -96,23 +116,20 @@ class _MapScreenState extends State<MapScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              Provider.of<ReportService>(context, listen: false)
-                  .fetchReports();
+              Provider.of<ReportService>(context, listen: false).fetchReports();
             },
             tooltip: 'Refresh reports',
           ),
           IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: () {
-              _mapController.move(_currentLocation, 13);
+              _mapController.move(_currentLocation, _defaultZoom);
             },
           ),
           IconButton(
             icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: Implement search
-              // TODO; Implement filter
-            },
+            onPressed: _openSearch,
+            tooltip: 'Search reports',
           ),
         ],
       ),
@@ -122,7 +139,7 @@ class _MapScreenState extends State<MapScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _currentLocation,
-              initialZoom: 13,
+              initialZoom: _defaultZoom,
               minZoom: 5,
               maxZoom: 18,
             ),
@@ -213,7 +230,7 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                       const SizedBox(height: 8),
                       Chip(
-                        label: Text(_selectedReport!.getCategoryDisplayName()),
+                        label: Text(_selectedReport!.category.displayName),
                         backgroundColor: Theme.of(
                           context,
                         ).colorScheme.primaryContainer,
@@ -247,7 +264,7 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                       const SizedBox(height: 8),
                       Chip(
-                        label: Text(_selectedReport!.getStatusDisplayName()),
+                        label: Text(_selectedReport!.status.displayName),
                         backgroundColor: _getMarkerColor(
                           _selectedReport!.status,
                         ).withOpacity(0.2),
@@ -315,6 +332,182 @@ class _LegendItem extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
+    );
+  }
+}
+
+// Search Delegate for map screen
+class MapSearchDelegate extends SearchDelegate<Report?> {
+  final List<Report> reports;
+  final Function(Report) onReportSelected;
+
+  MapSearchDelegate({required this.reports, required this.onReportSelected});
+
+  @override
+  String get searchFieldLabel => 'Search reports on map';
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, null);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _buildSearchResults(context);
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return _buildSearchResults(context);
+  }
+
+  Color _getStatusColor(ReportStatus status) {
+    switch (status) {
+      case ReportStatus.pending:
+        return Colors.orange;
+      case ReportStatus.approved:
+        return Colors.blue;
+      case ReportStatus.inProgress:
+        return Colors.amber;
+      case ReportStatus.resolved:
+        return Colors.green;
+      case ReportStatus.rejected:
+        return Colors.red;
+    }
+  }
+
+  Widget _buildSearchResults(BuildContext context) {
+    if (query.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Search reports',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Find reports by title, category, or location',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    final searchQuery = query.toLowerCase();
+    final results = reports.where((report) {
+      return report.title.toLowerCase().contains(searchQuery) ||
+          report.description.toLowerCase().contains(searchQuery) ||
+          report.category.displayName.toLowerCase().contains(searchQuery) ||
+          report.locationAddress.toLowerCase().contains(searchQuery);
+    }).toList();
+
+    if (results.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No results found',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try different keywords',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: results.length,
+      itemBuilder: (context, index) {
+        final report = results[index];
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: _getStatusColor(report.status).withOpacity(0.2),
+            child: Icon(
+              Icons.location_on,
+              color: _getStatusColor(report.status),
+            ),
+          ),
+          title: Text(
+            report.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                report.category.displayName,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              Text(
+                report.locationAddress,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          trailing: Chip(
+            label: Text(
+              report.status.displayName,
+              style: const TextStyle(fontSize: 11),
+            ),
+            backgroundColor: _getStatusColor(report.status).withOpacity(0.2),
+            labelStyle: TextStyle(color: _getStatusColor(report.status)),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            visualDensity: VisualDensity.compact,
+          ),
+          onTap: () {
+            onReportSelected(report);
+            close(context, report);
+          },
+        );
+      },
     );
   }
 }

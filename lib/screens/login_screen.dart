@@ -11,23 +11,27 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const double _logoSize = 100;
+  static const double _contentPadding = 24;
+  static const double _buttonVerticalPadding = 16;
   bool _isLoading = false;
 
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
   Future<void> _signInWithGoogle() async {
+    if (_isLoading) return;
     setState(() => _isLoading = true);
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       await authService.signInWithGoogle();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to sign in: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showError('Failed to sign in: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -40,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(_contentPadding),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -48,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // App Logo/Icon
               Icon(
                 Icons.home_work_rounded,
-                size: 100,
+                size: _logoSize,
                 color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(height: 24),
@@ -103,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 )
               else
-                FilledButton.icon(
+                ElevatedButton.icon(
                   onPressed: _signInWithGoogle,
                   icon: Image.asset(
                     'assets/google_logo.png',
@@ -116,10 +120,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     'Sign in with Google',
                     style: TextStyle(fontSize: 16),
                   ),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    elevation: 2,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: _buttonVerticalPadding,
+                      horizontal: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey.shade300),
                     ),
                   ),
                 ),

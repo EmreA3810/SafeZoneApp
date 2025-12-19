@@ -6,6 +6,9 @@ import 'package:firebase_database/firebase_database.dart';
 import '../models/user_model.dart';
 
 class AuthService extends ChangeNotifier {
+  static const String _usersCollection = 'users';
+  static const String _reportsSubmittedKey = 'reportsSubmitted';
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -29,6 +32,11 @@ class AuthService extends ChangeNotifier {
     });
   }
 
+  void _setLoading(bool value) {
+    _isLoading = value;
+    notifyListeners();
+  }
+
   Future<void> _loadUserData(String uid) async {
     try {
       // Read Firestore user doc (for role and other profile data)
@@ -40,24 +48,14 @@ class AuthService extends ChangeNotifier {
         }
       } catch (_) {}
 
-      // Source of truth for report count: Realtime Database users/<uid>/reportsSubmitted
-      int rtdbCount = 0;
-      try {
-        final rtdbSnap = await _database.ref().child('users').child(uid).get();
-        if (rtdbSnap.exists && rtdbSnap.value is Map) {
-          final data = Map<String, dynamic>.from(rtdbSnap.value as Map);
-          if (data['reportsSubmitted'] is int) {
-            rtdbCount = data['reportsSubmitted'] as int;
-          } else if (data['reportsSubmitted'] != null) {
-            rtdbCount = int.tryParse('${data['reportsSubmitted']}') ?? 0;
-          }
-        }
-      } catch (_) {}
+      final rtdbCount = await _getReportsSubmitted(uid);
 
       // Build AppUser by merging FirebaseAuth, RTDB count, and Firestore role
-      if (_auth.currentUser != null) {
-        final u = _auth.currentUser!;
-        final roleStr = firestoreData != null ? (firestoreData['role'] as String?) : null;
+      final u = _auth.currentUser;
+      if (u != null) {
+        final roleStr = firestoreData != null
+            ? (firestoreData['role'] as String?)
+            : null;
         final role = roleStr != null && roleStr.isNotEmpty
             ? UserRole.values.firstWhere(
                 (e) => e.name == roleStr,
@@ -90,15 +88,13 @@ class AuthService extends ChangeNotifier {
 
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      _isLoading = true;
-      notifyListeners();
+      _setLoading(true);
 
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-        _isLoading = false;
-        notifyListeners();
+        _setLoading(false);
         return null;
       }
 
@@ -122,12 +118,10 @@ class AuthService extends ChangeNotifier {
         await _createOrUpdateUser(userCredential.user!);
       }
 
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
       return userCredential;
     } catch (e) {
-      _isLoading = false;
-      notifyListeners();
+      _setLoading(false);
       if (kDebugMode) {
         print('Error signing in with Google: $e');
       }
@@ -136,23 +130,17 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _createOrUpdateUser(User user) async {
-    final userDoc = _firestore.collection('users').doc(user.uid);
+    final userDoc = _firestore.collection(_usersCollection).doc(user.uid);
     final docSnapshot = await userDoc.get();
 
     // Ensure RTDB user node exists with reportsSubmitted
     try {
-      final userRef = _database.ref().child('users').child(user.uid);
+      final userRef = _database.ref().child(_usersCollection).child(user.uid);
       final snap = await userRef.get();
-      int current = 0;
-      if (snap.exists && snap.value is Map) {
-        final data = Map<String, dynamic>.from(snap.value as Map);
-        if (data['reportsSubmitted'] is int) {
-          current = data['reportsSubmitted'] as int;
-        } else if (data['reportsSubmitted'] != null) {
-          current = int.tryParse('${data['reportsSubmitted']}') ?? 0;
-        }
-      }
-      await userRef.set({'reportsSubmitted': current});
+      final current = snap.exists && snap.value is Map
+          ? _parseReportsCount(Map<String, dynamic>.from(snap.value as Map))
+          : 0;
+      await userRef.set({_reportsSubmittedKey: current});
     } catch (e) {
       if (kDebugMode) {
         print('Warning: failed to init RTDB user node: $e');
@@ -201,9 +189,10 @@ class AuthService extends ChangeNotifier {
     if (currentUser == null) return;
 
     try {
-      await _firestore.collection('users').doc(currentUser!.uid).update({
-        'photoUrl': photoUrl,
-      });
+      await _firestore
+          .collection(_usersCollection)
+          .doc(currentUser!.uid)
+          .update({'photoUrl': photoUrl});
 
       if (_currentAppUser != null) {
         _currentAppUser = _currentAppUser!.copyWith(photoUrl: photoUrl);
@@ -228,13 +217,15 @@ class AuthService extends ChangeNotifier {
   // Admin: fetch all users from Firestore
   Future<List<AppUser>> fetchAllUsers() async {
     try {
-      final snapshot = await _firestore.collection('users').get();
+      final snapshot = await _firestore.collection(_usersCollection).get();
       final users = <AppUser>[];
       for (final doc in snapshot.docs) {
         final data = Map<String, dynamic>.from(doc.data());
         // Ensure createdAt is a String for AppUser.fromMap
         if (data['createdAt'] is Timestamp) {
-          data['createdAt'] = (data['createdAt'] as Timestamp).toDate().toIso8601String();
+          data['createdAt'] = (data['createdAt'] as Timestamp)
+              .toDate()
+              .toIso8601String();
         }
         if (data['createdAt'] == null) {
           data['createdAt'] = DateTime.now().toIso8601String();
@@ -253,12 +244,11 @@ class AuthService extends ChangeNotifier {
 
   // Admin: update another user's role in Firestore
   Future<void> updateUserRole(String uid, UserRole role) async {
-    // Client-side guard: require admin
-    if (_currentAppUser?.role != UserRole.admin) {
+    if (!(_currentAppUser?.role.isAdmin ?? false)) {
       throw Exception('Only admins can change user roles');
     }
     try {
-      await _firestore.collection('users').doc(uid).set({
+      await _firestore.collection(_usersCollection).doc(uid).set({
         'role': role.name,
       }, SetOptions(merge: true));
       // If updating own role, refresh cached app user
@@ -271,5 +261,28 @@ class AuthService extends ChangeNotifier {
       }
       rethrow;
     }
+  }
+
+  Future<int> _getReportsSubmitted(String uid) async {
+    try {
+      final rtdbSnap = await _database
+          .ref()
+          .child(_usersCollection)
+          .child(uid)
+          .get();
+      if (rtdbSnap.exists && rtdbSnap.value is Map) {
+        return _parseReportsCount(
+          Map<String, dynamic>.from(rtdbSnap.value as Map),
+        );
+      }
+    } catch (_) {}
+    return 0;
+  }
+
+  int _parseReportsCount(Map<String, dynamic> data) {
+    final value = data[_reportsSubmittedKey];
+    if (value is int) return value;
+    if (value != null) return int.tryParse('$value') ?? 0;
+    return 0;
   }
 }

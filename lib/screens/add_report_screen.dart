@@ -21,6 +21,12 @@ class AddReportScreen extends StatefulWidget {
 }
 
 class _AddReportScreenState extends State<AddReportScreen> {
+  static const double _maxImageWidth = 1920;
+  static const double _maxImageHeight = 1080;
+  static const int _imageQuality = 85;
+  static const int _maxTitleLength = 100;
+  static const int _maxDescriptionLength = 500;
+
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -37,15 +43,20 @@ class _AddReportScreenState extends State<AddReportScreen> {
   void initState() {
     super.initState();
     if (widget.existingReport != null) {
-      _titleController.text = widget.existingReport!.title;
-      _descriptionController.text = widget.existingReport!.description;
-      _selectedCategory = widget.existingReport!.category;
-      _selectedLocation = widget.existingReport!.location;
-      _locationAddress = widget.existingReport!.locationAddress;
-      _existingPhotoUrls.addAll(widget.existingReport!.photoUrls);
+      _loadExistingReport();
     } else {
       _getCurrentLocation();
     }
+  }
+
+  void _loadExistingReport() {
+    final report = widget.existingReport!;
+    _titleController.text = report.title;
+    _descriptionController.text = report.description;
+    _selectedCategory = report.category;
+    _selectedLocation = report.location;
+    _locationAddress = report.locationAddress;
+    _existingPhotoUrls.addAll(report.photoUrls);
   }
 
   @override
@@ -96,9 +107,9 @@ class _AddReportScreenState extends State<AddReportScreen> {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
         source: source,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
+        maxWidth: _maxImageWidth,
+        maxHeight: _maxImageHeight,
+        imageQuality: _imageQuality,
       );
 
       if (pickedFile != null) {
@@ -118,28 +129,15 @@ class _AddReportScreenState extends State<AddReportScreen> {
   void _showImageSourceDialog() {
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
+      builder: (context) => _ImageSourceSheet(
+        onCameraSelected: () {
+          Navigator.pop(context);
+          _pickImage(ImageSource.camera);
+        },
+        onGallerySelected: () {
+          Navigator.pop(context);
+          _pickImage(ImageSource.gallery);
+        },
       ),
     );
   }
@@ -177,37 +175,27 @@ class _AddReportScreenState extends State<AddReportScreen> {
       final authService = Provider.of<AuthService>(context, listen: false);
       final reportService = Provider.of<ReportService>(context, listen: false);
 
-      if (authService.currentUser == null) {
-        throw Exception('User not logged in');
+      final currentUser = authService.currentUser;
+      if (currentUser == null) {
+        throw Exception('Authentication required. Please log in again.');
       }
 
-      final report = Report(
-        id: widget.existingReport?.id,
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        category: _selectedCategory,
-        photoUrls: widget.existingReport != null ? _existingPhotoUrls : (widget.existingReport?.photoUrls ?? []),
-        location: _selectedLocation!,
-        locationAddress: _locationAddress,
-        userId: authService.currentUser!.uid,
-        userName: authService.currentUser!.displayName ?? 'Anonymous',
-        userPhotoUrl: authService.currentUser!.photoURL,
-        createdAt: widget.existingReport?.createdAt ?? DateTime.now(),
-        status: widget.existingReport?.status ?? ReportStatus.pending,
-      );
+      final report = _createReport(currentUser);
+      final isUpdate = widget.existingReport != null;
 
-      if (widget.existingReport != null) {
+      if (isUpdate) {
         await reportService.updateReport(
           widget.existingReport!.id!,
           report,
           _images.isNotEmpty ? _images : null,
-          removedPhotoUrls: _removedPhotoUrls.isNotEmpty ? _removedPhotoUrls : null,
+          removedPhotoUrls: _removedPhotoUrls.isNotEmpty
+              ? _removedPhotoUrls
+              : null,
         );
       } else {
         await reportService.createReport(report, _images);
       }
 
-      // Refresh user data so report count stays in sync on profile
       await authService.refreshUserData();
 
       if (mounted) {
@@ -215,7 +203,7 @@ class _AddReportScreenState extends State<AddReportScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              widget.existingReport != null
+              isUpdate
                   ? 'Report updated successfully'
                   : 'Report submitted successfully',
             ),
@@ -259,9 +247,13 @@ class _AddReportScreenState extends State<AddReportScreen> {
                 hintText: 'e.g., Pothole on Main Street',
                 prefixIcon: Icon(Icons.title),
               ),
+              maxLength: _maxTitleLength,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a title';
+                }
+                if (value.trim().length < 5) {
+                  return 'Title must be at least 5 characters';
                 }
                 return null;
               },
@@ -278,9 +270,13 @@ class _AddReportScreenState extends State<AddReportScreen> {
                 alignLabelWithHint: true,
               ),
               maxLines: 5,
+              maxLength: _maxDescriptionLength,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter a description';
+                }
+                if (value.trim().length < 10) {
+                  return 'Description must be at least 10 characters';
                 }
                 return null;
               },
@@ -297,7 +293,7 @@ class _AddReportScreenState extends State<AddReportScreen> {
               items: ReportCategory.values.map((category) {
                 return DropdownMenuItem(
                   value: category,
-                  child: Text(_getCategoryDisplayName(category)),
+                  child: Text(category.displayName),
                 );
               }).toList(),
               onChanged: (value) {
@@ -459,26 +455,52 @@ class _AddReportScreenState extends State<AddReportScreen> {
     );
   }
 
-  String _getCategoryDisplayName(ReportCategory category) {
-    switch (category) {
-      case ReportCategory.roadHazard:
-        return 'Road Hazard';
-      case ReportCategory.streetlight:
-        return 'Streetlight';
-      case ReportCategory.graffiti:
-        return 'Graffiti';
-      case ReportCategory.lostPet:
-        return 'Lost Pet';
-      case ReportCategory.foundPet:
-        return 'Found Pet';
-      case ReportCategory.parking:
-        return 'Parking Issue';
-      case ReportCategory.noise:
-        return 'Noise Complaint';
-      case ReportCategory.waste:
-        return 'Waste Management';
-      case ReportCategory.other:
-        return 'Other';
-    }
+  Report _createReport(dynamic currentUser) {
+    final existing = widget.existingReport;
+    return Report(
+      id: existing?.id,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      category: _selectedCategory,
+      photoUrls: _existingPhotoUrls,
+      location: _selectedLocation!,
+      locationAddress: _locationAddress,
+      userId: currentUser.uid,
+      userName: currentUser.displayName ?? 'Anonymous',
+      userPhotoUrl: currentUser.photoURL,
+      createdAt: existing?.createdAt ?? DateTime.now(),
+      status: existing?.status ?? ReportStatus.pending,
+    );
+  }
+}
+
+class _ImageSourceSheet extends StatelessWidget {
+  final VoidCallback onCameraSelected;
+  final VoidCallback onGallerySelected;
+
+  const _ImageSourceSheet({
+    required this.onCameraSelected,
+    required this.onGallerySelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.camera_alt),
+            title: const Text('Take Photo'),
+            onTap: onCameraSelected,
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library),
+            title: const Text('Choose from Gallery'),
+            onTap: onGallerySelected,
+          ),
+        ],
+      ),
+    );
   }
 }
