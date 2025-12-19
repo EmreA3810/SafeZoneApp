@@ -39,23 +39,28 @@ A Flutter mobile application that allows users to report and track community iss
 
 ### Firebase Setup
 
-1. **Create a Firebase Project**
-   - Go to [Firebase Console](https://console.firebase.google.com/)
-   - Create a new project named "SafeZone"
+See `FIREBASE_SETUP.md` for detailed instructions. Quick summary:
 
-2. **Enable Authentication**
-   - Go to Authentication > Sign-in method
-   - Enable Google Sign-In
+**Option 1: Manual Setup (Firebase Console)**
+1. Create Firebase project at https://console.firebase.google.com/
+2. Enable Authentication (Google Sign-In)
+3. Create Firestore Database
+4. Create Realtime Database (for optimized queries)
+5. Enable Storage
+6. Download and place config files:
+   - Android: `google-services.json` → `android/app/`
+   - iOS: `GoogleService-Info.plist` → `ios/Runner/` (via Xcode)
 
-3. **Create Firestore Database**
-   - Go to Firestore Database and create database
+**Option 2: Firebase CLI (Recommended)**
+```bash
+npm install -g firebase-tools
+firebase login
+firebase init
+firebase deploy --only database,firestore,storage
+```
+This automatically deploys optimized rules with indexes for better query performance.
 
-4. **Enable Firebase Storage**
-   - Go to Storage and enable it
-
-5. **Add Firebase to Your App**
-   - Download `google-services.json` (Android) and place in `android/app/`
-   - Download `GoogleService-Info.plist` (iOS) and add to `ios/Runner/`
+For complete Firebase CLI walkthrough, see `FIREBASE_SETUP.md` section 8.
 
 ### Installation Steps
 
@@ -86,14 +91,33 @@ A Flutter mobile application that allows users to report and track community iss
 
 ## Tech Stack
 
-- Flutter & Dart
-- Firebase (Auth, Firestore, Storage)
-- Provider (State Management)
-- flutter_map with OpenStreetMap
-- Image Picker & Cached Network Image
+- **Frontend**: Flutter & Dart, Material Design 3
+- **State Management**: Provider
+- **Backend**: Firebase
+  - Authentication (Google Sign-In)
+  - Firestore (user profiles)
+  - Realtime Database (reports with indexed queries)
+  - Cloud Storage (images)
+- **Maps**: flutter_map with OpenStreetMap
+- **Media**: Image Picker, flutter_image_compress, Cached Network Image
+- **Location**: geolocator, geocoding
+
+## Performance Optimizations
+
+- **RTDB Indexes**: Queries filtered by `userId`, `status`, `category` for efficient data retrieval
+- **Image Compression**: Auto-compress uploads to base64 (target width 800px, quality 70%)
+- **Lazy Loading**: Cached network images with fallbacks
+- **Debounced Search**: Reduces unnecessary rebuilds
+- **Provider Selectors**: Prevents unnecessary widget rebuilds on state changes
 
 ## Report Categories
 
 Road Hazard • Streetlight • Graffiti • Lost Pet • Found Pet • Parking • Noise • Waste • Other
+
+## Documentation
+
+- **Quick Start**: See `QUICKSTART.md` for 5-step setup
+- **Firebase Setup**: See `FIREBASE_SETUP.md` for detailed configuration and CLI instructions
+- **TODO List**: See `TODO.md` for planned features and optimizations
 
 Built with ❤️ using Flutter

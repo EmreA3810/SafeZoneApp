@@ -23,16 +23,28 @@ flutter pub get
 
 ### Step 2: Set Up Firebase (15-20 minutes)
 
-Follow the detailed instructions in `FIREBASE_SETUP.md` or quick version:
-
+**Option A: Using Firebase Console (Manual)**
+Follow the detailed instructions in `FIREBASE_SETUP.md`:
 1. Create Firebase project at https://console.firebase.google.com/
-2. Add Android/iOS app
-3. Download config files:
-   - Android: `google-services.json` → place in `android/app/`
-   - iOS: `GoogleService-Info.plist` → add via Xcode
-4. Enable Google Sign-In in Authentication
-5. Create Firestore Database
-6. Enable Storage
+2. Add Android/iOS apps
+3. Download & place config files
+4. Enable Authentication, Firestore, Realtime Database, and Storage
+
+**Option B: Using Firebase CLI (Recommended)**
+```bash
+# Install Firebase CLI
+npm install -g firebase-tools
+
+# Login to Firebase
+firebase login
+
+# Initialize from project root
+firebase init
+
+# Deploy rules (includes indexes for optimal performance)
+firebase deploy --only database,firestore,storage
+```
+See `FIREBASE_SETUP.md` section 8 for detailed Firebase CLI instructions.
 
 ### Step 3: Configure Permissions
 
@@ -184,7 +196,8 @@ lib/
 ## Need Help?
 
 - 📖 Read `README.md` for full documentation
-- 🔥 Check `FIREBASE_SETUP.md` for Firebase configuration
+- 🔥 Check `FIREBASE_SETUP.md` for complete Firebase setup (manual or CLI)
+- 🔧 See `FIREBASE_SETUP.md` section 8 for Firebase CLI quick start
 - 🐛 Check errors in terminal output
 - 💬 Common issues are listed above
 

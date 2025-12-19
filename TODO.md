@@ -60,16 +60,12 @@ All requested features have been successfully implemented! Below is the detailed
 - [x] Beautiful card layout with images
 - [x] User info (name, photo, timestamp)
 - [x] Like/unlike functionality
-- [x] Comment counter
 - [x] Status badges (Pending, In Progress, Resolved)
 - [x] Category chips
 - [x] Location display
 - [x] Pull-to-refresh
 - [x] Filter by status:
-  - [x] All reports
-  - [x] Pending only
-  - [x] In Progress only
-  - [x] Resolved only
+- [x] Filter by category:
 
 **Files:**
 - `lib/screens/feed_screen.dart` - Feed UI with filters
@@ -285,26 +281,46 @@ reports/{reportId}
 
 ### 🔥 Firebase Configuration (15-20 minutes)
 
-#### Step 1: Create Firebase Project
+#### Option 1: Using Firebase CLI (Recommended)
+```bash
+# Install Firebase CLI
+npm install -g firebase-tools
+
+# Login to Firebase
+firebase login
+
+# Initialize from project root
+firebase init
+
+# During setup, select: Realtime Database, Firestore, Storage
+
+# Deploy optimized rules with indexes
+firebase deploy --only database,firestore,storage
+```
+See `FIREBASE_SETUP.md` section 8 for detailed instructions.
+
+#### Option 2: Manual Setup (Firebase Console)
+
+##### Step 1: Create Firebase Project
 - [x] Go to https://console.firebase.google.com/
 - [x] Click "Add project"
 - [x] Name it "SafeZone"
 - [x] Follow wizard steps
 
-#### Step 2: Add Android App
+##### Step 2: Add Android App
 - [x] Click "Add app" → Android icon
 - [x] Package name: `com.example.safezone` (or your custom)
 - [x] Download `google-services.json`
 - [x] Place in: `android/app/google-services.json`
 - [ ] Add Gradle dependencies (see README)
 
-#### Step 3: Add iOS App (if targeting iOS)
+##### Step 3: Add iOS App (if targeting iOS)
 - [ ] Click "Add app" → iOS icon
 - [ ] Bundle ID: `com.example.safezone`
 - [ ] Download `GoogleService-Info.plist`
 - [ ] Add to Xcode project: `ios/Runner/`
 
-#### Step 4: Enable Authentication
+##### Step 4: Enable Authentication
 - [x] Go to Authentication → Sign-in method
 - [x] Enable "Google" provider
 - [x] Add support email
@@ -316,7 +332,7 @@ reports/{reportId}
   ```
 - [x] Download updated `google-services.json` after adding SHA-1
 
-#### Step 5: Create Firestore Database
+##### Step 5: Create Firestore Database
 - [x] Go to Firestore Database
 - [x] Click "Create database"
 - [x] Start in "Production mode"
@@ -341,7 +357,31 @@ reports/{reportId}
   }
   ```
 
-#### Step 6: Enable Storage
+##### Step 6: Create Realtime Database
+- [ ] Go to Realtime Database
+- [ ] Click "Create database"
+- [ ] Start in "Production mode"
+- [ ] Choose region
+- [ ] Deploy these rules for optimized queries:
+  ```json
+  {
+    "rules": {
+      "reports": {
+        ".read": true,
+        ".write": "auth != null",
+        ".indexOn": ["userId", "status", "category", "createdAt"]
+      },
+      "users": {
+        "$userId": {
+          ".read": true,
+          ".write": "auth != null && auth.uid === $userId"
+        }
+      }
+    }
+  }
+  ```
+
+##### Step 7: Enable Storage
 - [ ] Go to Storage
 - [ ] Click "Get started"
 - [ ] Start in "Production mode"
@@ -614,6 +654,8 @@ Your app is working correctly when:
 
 ---
 
-**Last Updated:** November 8, 2025  
-**Project Status:** 🟢 READY FOR FIREBASE SETUP  
-**Code Status:** ✅ 100% COMPLETE
+**Last Updated:** December 19, 2025  
+**Project Status:** 🟢 FULLY IMPLEMENTED WITH PERFORMANCE OPTIMIZATIONS  
+**Code Status:** ✅ 100% COMPLETE  
+**Firebase:** Supports both manual setup and CLI deployment  
+**Database Optimization:** RTDB indexed queries for user/status/category filtering
