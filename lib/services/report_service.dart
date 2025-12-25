@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';
 import '../models/report_model.dart';
 import 'image_utils.dart';
+import 'local_report_cache.dart';
 
 class ReportService extends ChangeNotifier {
   static const String _reportsPath = 'reports';
@@ -19,6 +20,22 @@ class ReportService extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
+  bool _isOffline = false;
+  bool get isOffline => _isOffline;
+
+  // Load cached reports on initialization
+  Future<void> loadCachedReportsIfNeeded() async {
+    if (_reports.isEmpty) {
+      final cached = await LocalReportCache.loadCachedReports();
+      if (cached.isNotEmpty) {
+        _reports = cached;
+        _isOffline = true;
+        notifyListeners();
+        if (kDebugMode) print('📱 Loaded ${cached.length} cached reports on startup');
+      }
+    }
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -29,7 +46,12 @@ class ReportService extends ChangeNotifier {
     try {
       _setLoading(true);
 
-      final snap = await _database.ref().child(_reportsPath).get();
+        // Apply a timeout so offline mode doesn't hang indefinitely
+      final snap = await _database
+          .ref()
+          .child(_reportsPath)
+          .get()
+          .timeout(const Duration(seconds: 5));
 
       if (!snap.exists || snap.value == null) {
         _reports = [];
@@ -48,15 +70,31 @@ class ReportService extends ChangeNotifier {
         // Sort by createdAt descending
         list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         _reports = list;
+        
+        // Cache the reports locally
+        await LocalReportCache.saveReports(_reports);
       }
 
+      _isOffline = false;
       _setLoading(false);
     } catch (e) {
       _setLoading(false);
       if (kDebugMode) {
         print('Error fetching reports: $e');
       }
-      rethrow;
+      
+      // If network error, try to load from cache
+      try {
+        final cachedReports = await LocalReportCache.loadCachedReports();
+        if (cachedReports.isNotEmpty) {
+          _reports = cachedReports;
+          _isOffline = true;
+          notifyListeners();
+          if (kDebugMode) print('📱 Loaded reports from cache (offline mode)');
+        }
+      } catch (cacheError) {
+        if (kDebugMode) print('Error loading cache: $cacheError');
+      }
     }
   }
 

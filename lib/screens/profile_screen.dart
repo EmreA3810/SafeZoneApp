@@ -7,6 +7,7 @@ import 'dart:io';
 import '../services/auth_service.dart';
 import '../providers/theme_provider.dart';
 import 'admin_user_management_screen.dart';
+import 'notification_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -295,9 +296,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       subtitle: const Text('Manage notification preferences'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
-                        // TODO: Navigate to notifications settings
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Coming soon!')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const NotificationSettingsScreen(),
+                          ),
                         );
                       },
                     ),

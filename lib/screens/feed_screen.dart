@@ -25,7 +25,9 @@ class _FeedScreenState extends State<FeedScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ReportService>(context, listen: false).fetchReports();
+      final reportService = Provider.of<ReportService>(context, listen: false);
+      reportService.loadCachedReportsIfNeeded();
+      reportService.fetchReports();
     });
   }
 
@@ -449,9 +451,40 @@ class _FeedScreenState extends State<FeedScreen> {
             ),
           ),
 
+          // Offline banner
+          if (reportService.isOffline)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Theme.of(context).colorScheme.secondary),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.wifi_off, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Offline: showing cached reports',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Reports list
           Expanded(
-            child: reportService.isLoading
+            // Show spinner only when loading AND there is no data yet.
+            child: (reportService.isLoading && filteredReports.isEmpty)
                 ? const Center(child: CircularProgressIndicator())
                 : filteredReports.isEmpty
                 ? RefreshIndicator(
