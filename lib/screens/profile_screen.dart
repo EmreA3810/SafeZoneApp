@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../services/auth_service.dart';
 import '../providers/theme_provider.dart';
+import 'notification_settings_screen.dart';
 import 'admin_user_management_screen.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,7 +18,6 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   static const double _avatarRadius = 60;
-  static const double _avatarInitialSize = 48;
   static const double _sectionSpacing = 32;
   static const double _buttonVerticalPadding = 16;
   bool _isUploadingPhoto = false;
@@ -26,10 +26,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     // Refresh user data when profile screen is opened
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      authService.refreshUserData();
-    });
+    final authService = Provider.of<AuthService>(context, listen: false);
+    authService.refreshUserData();
   }
 
   Future<void> _updateProfilePhoto() async {
@@ -43,7 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (pickedFile == null) return;
-
+      if (!mounted) return;
       setState(() => _isUploadingPhoto = true);
 
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -98,7 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
-
+    if (!mounted) return;
     if (confirmed == true) {
       try {
         final authService = Provider.of<AuthService>(context, listen: false);
@@ -129,10 +127,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ? const Center(child: Text('Please sign in'))
           : RefreshIndicator(
               onRefresh: () => authService.refreshUserData(),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                children: [
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    children: [
                   // Profile Header
                   Center(
                     child: Column(
@@ -141,15 +142,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           children: [
                             CircleAvatar(
                               radius: _avatarRadius,
-                              backgroundImage: user.photoURL != null
-                                  ? CachedNetworkImageProvider(user.photoURL!)
+                              backgroundImage: user.photoURL != null && user.photoURL!.isNotEmpty
+                                  ? NetworkImage(user.photoURL!)
                                   : null,
-                              child: user.photoURL == null
+                              child: user.photoURL == null || user.photoURL!.isEmpty
                                   ? Text(
-                                      user.displayName?[0].toUpperCase() ?? 'U',
-                                      style: const TextStyle(
-                                        fontSize: _avatarInitialSize,
-                                      ),
+                                      (user.displayName ?? 'User').isNotEmpty
+                                          ? (user.displayName ?? 'User')[0].toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
                                     )
                                   : null,
                             ),
@@ -295,9 +296,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       subtitle: const Text('Manage notification preferences'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
-                        // TODO: Navigate to notifications settings
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Coming soon!')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationSettingsScreen(),
+                          ),
                         );
                       },
                     ),
@@ -363,6 +366,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ],
+              ),
+                ),
               ),
             ),
     );

@@ -1,15 +1,9 @@
 enum UserRole {
-  user,
-  admin;
+  user('User'),
+  admin('Admin');
 
-  String get displayName {
-    switch (this) {
-      case UserRole.user:
-        return 'User';
-      case UserRole.admin:
-        return 'Admin';
-    }
-  }
+  const UserRole(this.displayName);
+  final String displayName;
 
   bool get isAdmin => this == UserRole.admin;
 }

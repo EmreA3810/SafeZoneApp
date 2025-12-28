@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
 
+
 class AdminUserManagementScreen extends StatefulWidget {
   const AdminUserManagementScreen({super.key});
 
@@ -103,57 +104,57 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Admin: Manage Users')),
       body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                labelText: 'Search by name or email',
-                border: OutlineInputBorder(),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: TextField(
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'Search by name or email',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) {
+                    _query = v;
+                    _applyFilter();
+                  },
+                ),
               ),
-              onChanged: (v) {
-                _query = v;
-                _applyFilter();
-              },
-            ),
-          ),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _loadUsers,
-                    child: ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _filteredUsers.length,
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _loadUsers,
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _filteredUsers.length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final user = _filteredUsers[index];
-                        return ListTile(
+                          itemBuilder: (context, index) {
+                            final user = _filteredUsers[index];
+                            return ListTile(
                           leading: CircleAvatar(
-                            backgroundImage: user.photoUrl != null
+                            radius: 20,
+                            backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty
                                 ? NetworkImage(user.photoUrl!)
                                 : null,
-                            child: user.photoUrl == null
+                            child: user.photoUrl == null || user.photoUrl!.isEmpty
                                 ? Text(
-                                    user.displayName.isNotEmpty
-                                        ? user.displayName[0].toUpperCase()
-                                        : '?',
+                                    user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '?',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                   )
                                 : null,
                           ),
-                          title: Text(user.displayName),
-                          subtitle: Text(user.email),
-                          trailing: _RoleBadgeButton(
-                            user: user,
-                            onRoleChanged: (role) => _updateRole(user, role),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-          ),
-        ],
+                              title: Text(user.displayName),
+                              subtitle: Text(user.email),
+                              trailing: _RoleBadgeButton(
+                                user: user,
+                                onRoleChanged: (role) => _updateRole(user, role),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
       ),
     );
   }
@@ -201,7 +202,7 @@ class _RoleBadgeButton extends StatelessWidget {
           vertical: 6,
         ),
         decoration: BoxDecoration(
-          color: roleColor.withOpacity(0.1),
+          color: roleColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(
             _AdminUserManagementScreenState._roleBadgeRadius,
           ),

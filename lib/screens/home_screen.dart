@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'feed_screen.dart';
 import 'map_screen.dart';
 import 'my_reports_screen.dart';
@@ -65,6 +66,59 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = kIsWeb || MediaQuery.of(context).size.width > 600;
+
+    if (isDesktop) {
+      return Scaffold(
+        body: SafeArea(
+          child: Row(
+            children: [
+              NavigationRail(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: _onTabTapped,
+                labelType: NavigationRailLabelType.all,
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.feed_outlined),
+                    selectedIcon: Icon(Icons.feed),
+                    label: Text('Feed'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.map_outlined),
+                    selectedIcon: Icon(Icons.map),
+                    label: Text('Map'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.description_outlined),
+                    selectedIcon: Icon(Icons.description),
+                    label: Text('My Reports'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.person_outline),
+                    selectedIcon: Icon(Icons.person),
+                    label: Text('Profile'),
+                  ),
+                ],
+                trailing: _currentIndex != 3
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: FloatingActionButton(
+                          onPressed: _navigateToAddReport,
+                          child: const Icon(Icons.add),
+                        ),
+                      )
+                    : null,
+              ),
+              const VerticalDivider(thickness: 1, width: 1),
+              Expanded(
+                child: IndexedStack(index: _currentIndex, children: _screens),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: IndexedStack(index: _currentIndex, children: _screens),
@@ -74,7 +128,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: _onTabTapped,
         destinations: _destinations,
       ),
-      // Only show Report button when NOT on Profile page (index 3)
       floatingActionButton: _currentIndex != 3
           ? FloatingActionButton.extended(
               onPressed: _navigateToAddReport,

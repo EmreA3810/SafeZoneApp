@@ -1,0 +1,20 @@
+# Never commit service account credentials
+serviceAccountKey.json
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets
+.env
+.env.*

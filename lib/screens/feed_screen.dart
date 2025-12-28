@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../widgets/image_from_string.dart';
@@ -6,6 +7,7 @@ import '../services/report_service.dart';
 import '../services/auth_service.dart';
 import '../models/report_model.dart';
 import 'add_report_screen.dart';
+
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -89,15 +91,18 @@ class _FeedScreenState extends State<FeedScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Filter buttons
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                // Status Filter Button
-                Expanded(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              // Filter buttons
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    // Status Filter Button
+                    Expanded(
                   child: PopupMenuButton<ReportStatus?>(
                     tooltip: 'Filter by Status',
                     onSelected: (value) {
@@ -110,8 +115,8 @@ class _FeedScreenState extends State<FeedScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: _selectedStatusFilter != null
-                            ? Theme.of(context).colorScheme.primaryContainer
-                            : Theme.of(context).colorScheme.surfaceVariant,
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _selectedStatusFilter != null
@@ -273,8 +278,8 @@ class _FeedScreenState extends State<FeedScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: _selectedCategoryFilter != null
-                            ? Theme.of(context).colorScheme.primaryContainer
-                            : Theme.of(context).colorScheme.surfaceVariant,
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _selectedCategoryFilter != null
@@ -515,6 +520,8 @@ class _FeedScreenState extends State<FeedScreen> {
                   ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
@@ -716,11 +723,15 @@ class _ReportCardState extends State<ReportCard> {
           // User info header
           ListTile(
             leading: CircleAvatar(
-              backgroundImage: report.userPhotoUrl != null
-                  ? NetworkImage(report.userPhotoUrl!) as ImageProvider
+              radius: 20,
+              backgroundImage: report.userPhotoUrl != null && report.userPhotoUrl!.isNotEmpty
+                  ? NetworkImage(report.userPhotoUrl!)
                   : null,
-              child: report.userPhotoUrl == null
-                  ? Text(report.userName[0].toUpperCase())
+              child: report.userPhotoUrl == null || report.userPhotoUrl!.isEmpty
+                  ? Text(
+                      report.userName.isNotEmpty ? report.userName[0].toUpperCase() : '?',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    )
                   : null,
             ),
             title: Text(report.userName),
@@ -730,7 +741,7 @@ class _ReportCardState extends State<ReportCard> {
                 report.status.displayName,
                 style: const TextStyle(fontSize: 12),
               ),
-              backgroundColor: _getStatusColor(context).withOpacity(0.2),
+              backgroundColor: _getStatusColor(context).withValues(alpha: 0.2),
               labelStyle: TextStyle(color: _getStatusColor(context)),
               padding: EdgeInsets.zero,
             ),
@@ -740,17 +751,28 @@ class _ReportCardState extends State<ReportCard> {
           if (report.photoUrls.isNotEmpty)
             Stack(
               children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: report.photoUrls.length,
-                    itemBuilder: (context, index) {
-                      return ImageFromString(
-                        src: report.photoUrls[index],
-                        fit: BoxFit.cover,
-                      );
-                    },
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        dragDevices: {
+                          PointerDeviceKind.touch,
+                          PointerDeviceKind.mouse,
+                        },
+                      ),
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: report.photoUrls.length,
+                        itemBuilder: (context, index) {
+                          return ImageFromString(
+                            src: report.photoUrls[index],
+                            fit: BoxFit.contain,
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
                 // Image counter badge

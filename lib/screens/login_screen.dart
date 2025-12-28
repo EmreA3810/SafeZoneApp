@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../services/auth_service.dart';
 
@@ -43,12 +44,15 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(_contentPadding),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Padding(
+              padding: const EdgeInsets.all(_contentPadding),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
               // App Logo/Icon
               Icon(
                 Icons.home_work_rounded,
@@ -109,13 +113,9 @@ class _LoginScreenState extends State<LoginScreen> {
               else
                 ElevatedButton.icon(
                   onPressed: _signInWithGoogle,
-                  icon: Image.asset(
-                    'assets/google_logo.png',
-                    height: 24,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.g_mobiledata, size: 24);
-                    },
-                  ),
+                  icon: kIsWeb
+                      ? const Icon(Icons.g_mobiledata, size: 24)
+                      : const Icon(Icons.g_mobiledata, size: 24),
                   label: const Text(
                     'Sign in with Google',
                     style: TextStyle(fontSize: 16),
@@ -146,6 +146,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 textAlign: TextAlign.center,
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

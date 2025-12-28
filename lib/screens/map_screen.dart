@@ -157,7 +157,7 @@ class _MapScreenState extends State<MapScreen> {
                     height: 40,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.3),
+                        color: Colors.blue.withValues(alpha: 0.3),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -201,11 +201,14 @@ class _MapScreenState extends State<MapScreen> {
               bottom: 0,
               left: 0,
               right: 0,
-              child: Card(
-                margin: const EdgeInsets.all(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: Card(
+                    margin: const EdgeInsets.all(16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -267,7 +270,7 @@ class _MapScreenState extends State<MapScreen> {
                         label: Text(_selectedReport!.status.displayName),
                         backgroundColor: _getMarkerColor(
                           _selectedReport!.status,
-                        ).withOpacity(0.2),
+                        ).withValues(alpha: 0.2),
                         labelStyle: TextStyle(
                           color: _getMarkerColor(_selectedReport!.status),
                         ),
@@ -275,11 +278,23 @@ class _MapScreenState extends State<MapScreen> {
                       const SizedBox(height: 8),
                       FilledButton(
                         onPressed: () {
-                          // TODO: Navigate to report details
+                          final id = _selectedReport!.id;
+                          if (id == null || id.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Unable to open report: missing ID')),
+                            );
+                            return;
+                          }
+                          Navigator.of(context).pushNamed(
+                            '/report',
+                            arguments: id,
+                          );
                         },
                         child: const Text('View Details'),
                       ),
                     ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -463,7 +478,7 @@ class MapSearchDelegate extends SearchDelegate<Report?> {
         final report = results[index];
         return ListTile(
           leading: CircleAvatar(
-            backgroundColor: _getStatusColor(report.status).withOpacity(0.2),
+            backgroundColor: _getStatusColor(report.status).withValues(alpha: 0.2),
             child: Icon(
               Icons.location_on,
               color: _getStatusColor(report.status),
@@ -497,7 +512,7 @@ class MapSearchDelegate extends SearchDelegate<Report?> {
               report.status.displayName,
               style: const TextStyle(fontSize: 11),
             ),
-            backgroundColor: _getStatusColor(report.status).withOpacity(0.2),
+            backgroundColor: _getStatusColor(report.status).withValues(alpha: 0.2),
             labelStyle: TextStyle(color: _getStatusColor(report.status)),
             padding: const EdgeInsets.symmetric(horizontal: 8),
             visualDensity: VisualDensity.compact,

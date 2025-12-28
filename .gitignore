@@ -54,3 +54,17 @@ android/app/google-services.json
 pubspec.lock
 
 android/app/google-services.json
+
+# Local secrets
+.env
+.env.*
+
+# Platform build caches
+android/.gradle/
+ios/Pods/
+
+# Signing keys (do not commit)
+*.keystore
+*.jks
+*.p8
+*.p12

@@ -1,0 +1,16 @@
+{
+  "name": "safezone-notification-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone notification worker for SafeZone - monitors RTDB and sends FCM notifications",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node worker.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

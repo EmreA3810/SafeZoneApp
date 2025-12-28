@@ -1,61 +1,29 @@
 import 'package:latlong2/latlong.dart';
 
 enum ReportStatus {
-  pending,
-  approved,
-  inProgress,
-  resolved,
-  rejected;
+  pending('Pending'),
+  approved('Approved'),
+  inProgress('In Progress'),
+  resolved('Resolved'),
+  rejected('Rejected');
 
-  String get displayName {
-    switch (this) {
-      case ReportStatus.pending:
-        return 'Pending';
-      case ReportStatus.approved:
-        return 'Approved';
-      case ReportStatus.inProgress:
-        return 'In Progress';
-      case ReportStatus.resolved:
-        return 'Resolved';
-      case ReportStatus.rejected:
-        return 'Rejected';
-    }
-  }
+  const ReportStatus(this.displayName);
+  final String displayName;
 }
 
 enum ReportCategory {
-  roadHazard,
-  streetlight,
-  graffiti,
-  lostPet,
-  foundPet,
-  parking,
-  noise,
-  waste,
-  other;
+  roadHazard('Road Hazard'),
+  streetlight('Streetlight'),
+  graffiti('Graffiti'),
+  lostPet('Lost Pet'),
+  foundPet('Found Pet'),
+  parking('Parking Issue'),
+  noise('Noise Complaint'),
+  waste('Waste Management'),
+  other('Other');
 
-  String get displayName {
-    switch (this) {
-      case ReportCategory.roadHazard:
-        return 'Road Hazard';
-      case ReportCategory.streetlight:
-        return 'Streetlight';
-      case ReportCategory.graffiti:
-        return 'Graffiti';
-      case ReportCategory.lostPet:
-        return 'Lost Pet';
-      case ReportCategory.foundPet:
-        return 'Found Pet';
-      case ReportCategory.parking:
-        return 'Parking Issue';
-      case ReportCategory.noise:
-        return 'Noise Complaint';
-      case ReportCategory.waste:
-        return 'Waste Management';
-      case ReportCategory.other:
-        return 'Other';
-    }
-  }
+  const ReportCategory(this.displayName);
+  final String displayName;
 }
 
 class Report {
@@ -194,10 +162,6 @@ class Report {
       likedBy: likedBy ?? this.likedBy,
     );
   }
-
-  String getCategoryDisplayName() => category.displayName;
-
-  String getStatusDisplayName() => status.displayName;
 
   @override
   bool operator ==(Object other) =>

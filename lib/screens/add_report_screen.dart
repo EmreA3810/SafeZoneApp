@@ -236,9 +236,12 @@ class _AddReportScreenState extends State<AddReportScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
             // Title
             TextFormField(
               controller: _titleController,
@@ -450,6 +453,8 @@ class _AddReportScreenState extends State<AddReportScreen> {
                     ),
             ),
           ],
+            ),
+          ),
         ),
       ),
     );

@@ -1,8 +1,11 @@
+import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/user_model.dart';
 
 class AuthService extends ChangeNotifier {
@@ -13,6 +16,7 @@ class AuthService extends ChangeNotifier {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseDatabase _database = FirebaseDatabase.instance;
+  StreamSubscription<String>? _fcmSub;
 
   User? get currentUser => _auth.currentUser;
   AppUser? _currentAppUser;
@@ -25,8 +29,10 @@ class AuthService extends ChangeNotifier {
     _auth.authStateChanges().listen((User? user) {
       if (user != null) {
         _loadUserData(user.uid);
+        _setupFcmTokenSync(user.uid);
       } else {
         _currentAppUser = null;
+        _teardownFcmTokenSync();
       }
       notifyListeners();
     });
@@ -35,6 +41,68 @@ class AuthService extends ChangeNotifier {
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
+  }
+
+  Future<void> _setupFcmTokenSync(String uid) async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      final token = await messaging.getToken();
+      if (token != null) {
+        await _saveFcmToken(uid, token);
+      }
+      await _fcmSub?.cancel();
+      _fcmSub = messaging.onTokenRefresh.listen((newToken) async {
+        final cu = _auth.currentUser;
+        if (cu == null) return;
+        try {
+          await _saveFcmToken(cu.uid, newToken);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error saving refreshed FCM token: $e');
+          }
+        }
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error setting up FCM token sync: $e');
+      }
+    }
+  }
+
+  void _teardownFcmTokenSync() {
+    _fcmSub?.cancel();
+    _fcmSub = null;
+  }
+
+  Future<void> _saveFcmToken(String uid, String token) async {
+    try {
+      String platform = 'other';
+      if (kIsWeb) {
+        platform = 'web';
+      } else {
+        try {
+          if (Platform.isAndroid) {
+            platform = 'android';
+          } else if (Platform.isIOS) {
+            platform = 'ios';
+          }
+        } catch (_) {
+          // Platform detection failed, use 'other'
+        }
+      }
+      
+      await _firestore.collection(_usersCollection).doc(uid).set({
+        'fcmToken': token,
+        'fcmTokenPlatform': platform,
+        'fcmTokens': FieldValue.arrayUnion([token]),
+        'lastTokenAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error saving FCM token to Firestore: $e');
+      }
+      rethrow;
+    }
   }
 
   Future<void> _loadUserData(String uid) async {
@@ -90,36 +158,47 @@ class AuthService extends ChangeNotifier {
     try {
       _setLoading(true);
 
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-      if (googleUser == null) {
+      // On Web, avoid google_sign_in (which may call People API) and use popup
+      if (kIsWeb) {
+        final provider = GoogleAuthProvider();
+        // Optional: prompt account chooser each time
+        provider.setCustomParameters({
+          'prompt': 'select_account',
+        });
+        final userCredential = await _auth.signInWithPopup(provider);
+        if (userCredential.user != null) {
+          await _createOrUpdateUser(userCredential.user!);
+        }
         _setLoading(false);
-        return null;
+        return userCredential;
+      } else {
+        // Mobile/Desktop: use google_sign_in flow
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+        if (googleUser == null) {
+          _setLoading(false);
+          return null;
+        }
+
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        final UserCredential userCredential = await _auth.signInWithCredential(
+          credential,
+        );
+
+        if (userCredential.user != null) {
+          await _createOrUpdateUser(userCredential.user!);
+        }
+
+        _setLoading(false);
+        return userCredential;
       }
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Sign in to Firebase with the Google credential
-      final UserCredential userCredential = await _auth.signInWithCredential(
-        credential,
-      );
-
-      // Create or update user document in Firestore
-      if (userCredential.user != null) {
-        await _createOrUpdateUser(userCredential.user!);
-      }
-
-      _setLoading(false);
-      return userCredential;
     } catch (e) {
       _setLoading(false);
       if (kDebugMode) {

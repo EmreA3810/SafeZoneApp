@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../widgets/image_from_string.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -73,7 +74,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
         ],
       ),
     );
-
+    if (!mounted) return; // Added mounted guard
     if (confirmed == true) {
       try {
         final reportService = Provider.of<ReportService>(
@@ -92,7 +93,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
         // Refresh user data so profile report count stays in sync
         await authService.refreshUserData();
 
-        if (mounted) {
+        if (mounted) { // Check if mounted before showing snackbar
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Report deleted successfully')),
           );
@@ -246,7 +247,7 @@ class _MyReportsScreenState extends State<MyReportsScreen> {
                                 ),
                                 backgroundColor: _getStatusColor(
                                   report.status,
-                                ).withOpacity(0.2),
+                                ).withValues(alpha: 0.2),
                                 labelStyle: TextStyle(
                                   color: _getStatusColor(report.status),
                                 ),
@@ -348,15 +349,23 @@ class _ReportImageCarouselState extends State<_ReportImageCarousel> {
       children: [
         AspectRatio(
           aspectRatio: widget.aspectRatio,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: widget.photoUrls.length,
-            itemBuilder: (context, index) {
-              return ImageFromString(
-                src: widget.photoUrls[index],
-                fit: BoxFit.cover,
-              );
-            },
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              dragDevices: {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+              },
+            ),
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.photoUrls.length,
+              itemBuilder: (context, index) {
+                return ImageFromString(
+                  src: widget.photoUrls[index],
+                  fit: BoxFit.cover,
+                );
+              },
+            ),
           ),
         ),
         if (widget.photoUrls.length > 1)
