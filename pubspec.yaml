@@ -55,6 +55,7 @@ dependencies:
   geocoding: ^4.0.0
   flutter_image_compress: ^2.4.0
   timeago: ^3.7.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

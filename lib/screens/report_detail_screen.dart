@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/report_model.dart';
 import '../services/report_service.dart';
 import '../widgets/image_from_string.dart';
@@ -25,6 +26,28 @@ class ReportDetailScreen extends StatelessWidget {
         return Colors.green;
       case ReportStatus.rejected:
         return Colors.red;
+    }
+  }
+
+  Future<void> _openMapLocation(BuildContext context, double latitude, double longitude) async {
+    final mapUrl = 'https://www.google.com/maps/search/$latitude,$longitude';
+    
+    try {
+      if (await canLaunchUrl(Uri.parse(mapUrl))) {
+        await launchUrl(Uri.parse(mapUrl), mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open map application')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening map: $e')),
+        );
+      }
     }
   }
 
@@ -52,7 +75,7 @@ class ReportDetailScreen extends StatelessWidget {
           }
 
           if (data is Map) {
-            final map = Map<String, dynamic>.from(data as Map);
+            final map = Map<String, dynamic>.from(data);
             final report = Report.fromMap(reportId, map);
 
             return Center(
@@ -152,19 +175,30 @@ class ReportDetailScreen extends StatelessWidget {
                             const SizedBox(height: 16),
 
                             // Location
-                            Row(
-                              children: [
-                                Icon(Icons.location_on, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    report.locationAddress,
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                            GestureDetector(
+                              onTap: () {
+                                _openMapLocation(context, report.location.latitude, report.location.longitude);
+                              },
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.location_on, size: 16, color: Theme.of(context).colorScheme.primary),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        report.locationAddress,
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.primary,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
                             ),
                           ],
                         ),

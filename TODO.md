@@ -1,8 +1,8 @@
 # SafeZone - Implementation Status & TODO Checklist
 
-## 📋 Project Status: ✅ FULLY IMPLEMENTED
+## 📋 Project Status: ✅ CORE FEATURES COMPLETE - SECURITY FEATURES IN PROGRESS
 
-All requested features have been successfully implemented! Below is the detailed breakdown.
+All core features have been successfully implemented! Below is the detailed breakdown.
 
 ---
 
@@ -654,8 +654,90 @@ Your app is working correctly when:
 
 ---
 
-**Last Updated:** December 19, 2025  
-**Project Status:** 🟢 FULLY IMPLEMENTED WITH PERFORMANCE OPTIMIZATIONS  
-**Code Status:** ✅ 100% COMPLETE  
-**Firebase:** Supports both manual setup and CLI deployment  
-**Database Optimization:** RTDB indexed queries for user/status/category filtering
+**Last Updated:** January 15, 2026  
+**Project Status:** 🟡 CORE COMPLETE - SECURITY FEATURES IN PROGRESS  
+**Latest:** Added card click navigation, liked reports screen, gesture-based UI  
+**Next Priority:** Phase 1 - Report Visibility & Security Rules
+
+---
+
+## 📋 NEW FEATURE ROADMAP (Added January 15)
+
+### ✨ Just Completed
+- ✅ Gesture-based card navigation on Map, Feed, Liked Reports
+- ✅ New Liked Reports screen accessible from Profile
+- ✅ Cleaner profile screen with Liked Reports link
+
+### 🚀 Phase 1: Report Visibility & Security (HIGH PRIORITY)
+
+**Goal:** Prevent unapproved reports from public view
+
+#### 1.1 Visibility Rules
+```
+Pending & Rejected → Private (only creator & admins see)
+Approved, In Progress, Resolved → Public (everyone sees)
+```
+
+**To-Do:**
+- [ ] Add isPublic property to Report model
+- [ ] Modify ReportService queries to filter by visibility
+- [ ] Update Feed & Map screens with filters
+- [ ] Add "Private" badge on user reports
+- [ ] Update Firestore security rules
+
+#### 1.2 Admin Moderation
+- [ ] Admins see all reports
+- [ ] Non-admins see only public + own private reports
+
+---
+
+### 🔔 Phase 2: Subscriber Notifications (MEDIUM PRIORITY)
+
+**Goal:** Notify users about new public reports in their categories
+
+#### 2.1 Category Subscriptions
+- [ ] Let users follow report categories
+- [ ] Store in preferences/subscribedCategories
+- [ ] UI for managing subscriptions
+
+#### 2.2 Notification Trigger
+```
+WHEN: Report status changes to public
+THEN:
+- Notify creator
+- Notify category subscribers
+- Send via FCM + in-app
+```
+
+**To-Do:**
+- [ ] Set up Firebase Cloud Messaging (FCM)
+- [ ] Create NotificationService
+- [ ] Query subscribers & send notifications
+- [ ] Create notification center screen
+
+---
+
+### 👨‍💼 Phase 3: Admin Tools (LOW PRIORITY)
+- [ ] Moderation queue
+- [ ] Bulk status updates
+- [ ] Rejection notes
+- [ ] Comments section
+- [ ] Status history/timeline
+
+---
+
+## 📊 Implementation Progress
+
+| Feature | Status | Priority |
+|---------|--------|----------|
+| Core App (Auth, Feed, Map, Reports) | ✅ 100% | - |
+| Card Navigation | ✅ 100% | - |
+| Liked Reports Screen | ✅ 100% | - |
+| Report Visibility Rules | ⏳ 0% | HIGH |
+| Category Subscriptions | ⏳ 0% | MEDIUM |
+| Notifications | ⏳ 0% | MEDIUM |
+| Admin Moderation | ⏳ 0% | LOW |
+
+---
+
+**Updated:** January 15, 2026

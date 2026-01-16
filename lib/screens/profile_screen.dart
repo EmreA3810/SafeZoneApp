@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../providers/theme_provider.dart';
 import 'notification_settings_screen.dart';
 import 'admin_user_management_screen.dart';
+import 'liked_reports_screen.dart';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -269,6 +270,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+
+                  // Liked Reports
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.thumb_up_outlined),
+                      title: const Text('Liked Reports'),
+                      subtitle: const Text('View reports you liked'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LikedReportsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
 
                   // Theme Toggle
                   Card(

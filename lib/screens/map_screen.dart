@@ -204,95 +204,93 @@ class _MapScreenState extends State<MapScreen> {
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 900),
-                  child: Card(
-                    margin: const EdgeInsets.all(16),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _selectedReport!.title,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+                  child: GestureDetector(
+                    onTap: () {
+                      final id = _selectedReport!.id;
+                      if (id == null || id.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Unable to open report: missing ID')),
+                        );
+                        return;
+                      }
+                      Navigator.of(context).pushNamed(
+                        '/report',
+                        arguments: id,
+                      );
+                    },
+                    child: Card(
+                      margin: const EdgeInsets.all(16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedReport!.title,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () {
-                              setState(() {
-                                _selectedReport = null;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Chip(
-                        label: Text(_selectedReport!.category.displayName),
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _selectedReport!.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              _selectedReport!.locationAddress,
-                              style: Theme.of(context).textTheme.bodySmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedReport = null;
+                                });
+                              },
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Chip(
-                        label: Text(_selectedReport!.status.displayName),
-                        backgroundColor: _getMarkerColor(
-                          _selectedReport!.status,
-                        ).withValues(alpha: 0.2),
-                        labelStyle: TextStyle(
-                          color: _getMarkerColor(_selectedReport!.status),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      FilledButton(
-                        onPressed: () {
-                          final id = _selectedReport!.id;
-                          if (id == null || id.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Unable to open report: missing ID')),
-                            );
-                            return;
-                          }
-                          Navigator.of(context).pushNamed(
-                            '/report',
-                            arguments: id,
-                          );
-                        },
-                        child: const Text('View Details'),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        Chip(
+                          label: Text(_selectedReport!.category.displayName),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _selectedReport!.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                _selectedReport!.locationAddress,
+                                style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Chip(
+                          label: Text(_selectedReport!.status.displayName),
+                          backgroundColor: _getMarkerColor(
+                            _selectedReport!.status,
+                          ).withValues(alpha: 0.2),
+                          labelStyle: TextStyle(
+                            color: _getMarkerColor(_selectedReport!.status),
+                          ),
+                        ),
+                      ],
+                        ),
                       ),
                     ),
                   ),
@@ -314,6 +312,8 @@ class _MapScreenState extends State<MapScreen> {
                     _LegendItem(color: Colors.orange, label: 'Pending'),
                     _LegendItem(color: Colors.amber, label: 'In Progress'),
                     _LegendItem(color: Colors.green, label: 'Resolved'),
+                    _LegendItem(color: Colors.red, label: 'Rejected'),
+                    _LegendItem(color: Colors.blue, label: 'Approved'),
                   ],
                 ),
               ),

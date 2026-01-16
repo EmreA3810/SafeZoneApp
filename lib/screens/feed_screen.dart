@@ -715,9 +715,23 @@ class _ReportCardState extends State<ReportCard> {
     final currentUserId = widget.currentUserId;
     final isLiked = report.likedBy.contains(currentUserId);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
+    return GestureDetector(
+      onTap: () {
+        final id = report.id;
+        if (id == null || id.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to open report: missing ID')),
+          );
+          return;
+        }
+        Navigator.of(context).pushNamed(
+          '/report',
+          arguments: id,
+        );
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // User info header
@@ -1124,6 +1138,7 @@ class _ReportCardState extends State<ReportCard> {
           ),
         ],
       ),
+    ),
     );
   }
 }
